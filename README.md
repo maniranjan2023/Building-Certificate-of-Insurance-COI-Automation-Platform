@@ -29,7 +29,7 @@
 
 ## Why This Product Exists
 
-When a landlord rents out a flat in Mumbai, a shop in Delhi, or an apartment in Texas, the lease almost always requires one thing before keys are handed over: a **Certificate of Insurance (COI)**.
+When a landlord rents out a condo in Florida, a retail unit in Toronto, or an apartment building in Vancouver, the lease almost always requires one thing before keys are handed over: a **Certificate of Insurance (COI)**.
 
 A COI is not the insurance policy itself. It is a one-page summary that proves the tenant (or their business) carries active liability coverage — and that the landlord is protected if something goes wrong on the property.
 
@@ -55,7 +55,7 @@ Before accepting a tenant — and again at every policy renewal — the landlord
 
 | Requirement | What can go wrong if missed |
 |-------------|---------------------------|
-| **Liability limits** | Coverage below lease minimum ($1M / ₹1 Cr) — landlord exposed in a claim |
+| **Liability limits** | Coverage below lease minimum ($1M USD / $2M CAD) — landlord exposed in a claim |
 | **Additional insured** | Landlord not named on the policy — no protection during incidents |
 | **Policy dates** | Gap between expiry and renewal — property operates uninsured |
 | **Required endorsements** | Missing waiver of subrogation or primary/non-contributory clause — lease violation |
@@ -102,14 +102,16 @@ This cycle repeats for **every tenant, every year, every property**.
 
 ### The cost is not just time — it is uncovered liability
 
-**In the USA:**
+**In the USA (e.g. Florida, Texas):**
 - Slip-and-fall or property damage claim hits an uninsured tenant → landlord's own policy may not cover it
 - Lenders and HOAs require proof of tenant insurance — non-compliance blocks refinancing or sale
 - Lease default grounds if tenant fails to maintain required coverage
+- Florida condo associations and property managers often require COIs before tenant move-in
 
-**In India:**
-- Commercial leases and shop agreements require liability proof — GST and registration compliance tied to valid tenancy
-- Housing societies (RWAs) mandate insurance for vendors and shop tenants
+**In Canada (e.g. Ontario, British Columbia):**
+- Commercial and residential leases require tenants to carry liability insurance and name the landlord as additional insured
+- Condo corporations and property management firms mandate COIs for vendors, contractors, and commercial tenants
+- Provincial tenancy and commercial lease standards tie insurance proof to ongoing compliance
 - Uninsured contractor or tenant incident → landlord bears the financial and legal burden
 
 > **One missed clause on one tenant's COI can cost more than a year of property management fees.**
