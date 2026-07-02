@@ -622,47 +622,48 @@ Before counting risk reduction from missed expiries
 
 | Layer | Technology | Role |
 |-------|-----------|------|
-| **Frontend** | Next.js 15 (App Router), TypeScript, Tailwind CSS, shadcn/ui | Admin dashboard, COI viewer, checklist editor, template editor, metrics |
-| **Backend** | TypeScript (Node.js), Fastify or Express | REST API, webhooks, business logic, auth |
+| **Full-stack app** | Next.js 15 (App Router), TypeScript, Tailwind CSS, shadcn/ui | **Frontend:** dashboard, COI viewer, checklist, templates, metrics · **Backend:** API routes, webhooks, auth, business logic |
 | **Database** | Neon PostgreSQL | COI records, versions, checklist, templates, audit logs, metrics |
 | **ORM** | Prisma or Drizzle | Schema management, migrations, type-safe queries |
 | **File Storage** | Cloudinary | Immutable COI originals, secure URLs, PDF delivery |
-| **Job Queue** | BullMQ + Redis | Async AI processing for all intake channels |
+| **Job Queue** | BullMQ + Redis | Async AI processing (worker runs as separate process from same codebase) |
 | **AI** | OpenAI SDK → Groq LLM | Multi-agent sequential pipeline |
 | **Email** | AgentMail (`maniranjan@agentmail.to`) | Inbound COI intake + outbound templated replies |
-| **Auth** | JWT | Single admin session |
+| **Auth** | JWT (via Next.js API routes) | Single admin session |
 
 ---
 
 ## Architecture Overview
 
 ```
-                    ┌──────────────────────────────────────┐
-                    │           Next.js Frontend           │
-                    │  Dashboard · Checklist · Templates │
-                    │  Metrics · COI Viewer · Notes        │
-                    └──────────────────┬───────────────────┘
-                                       │ REST API
-                    ┌──────────────────▼───────────────────┐
-                    │        TypeScript Backend            │
-                    │  Auth · COI CRUD · Webhooks · Jobs   │
-                    └──┬──────────────┬──────────────┬─────┘
-                       │              │              │
-              ┌────────▼───┐  ┌───────▼──────┐  ┌───▼────────┐
-              │ Neon PG    │  │  Cloudinary  │  │   BullMQ     │
-              │ (records)  │  │  (documents) │  │   (jobs)     │
-              └────────────┘  └──────────────┘  └───┬──────────┘
-                                                     │
-                              ┌──────────────────────▼──────────┐
-                              │     Multi-Agent AI Workers      │
-                              │  Groq LLM via OpenAI SDK        │
-                              │  Agent 1 → 2 → 3 → 4 → 5       │
-                              └──────────────────────┬──────────┘
-                                                     │
-                              ┌──────────────────────▼──────────┐
-                              │  AgentMail (inbound + outbound) │
-                              │  maniranjan@agentmail.to        │
-                              └─────────────────────────────────┘
+                    ┌──────────────────────────────────────────────┐
+                    │              Next.js (full-stack)             │
+                    │  ┌────────────────┐  ┌─────────────────────┐  │
+                    │  │    Frontend    │  │   Backend (API)     │  │
+                    │  │  Dashboard ·   │  │  Route handlers ·   │  │
+                    │  │  Checklist ·   │  │  Webhooks · Auth ·  │  │
+                    │  │  Templates ·   │  │  COI CRUD · Upload  │  │
+                    │  │  Metrics       │  │                     │  │
+                    │  └────────────────┘  └──────────┬──────────┘  │
+                    └─────────────────────────────────┼────────────┘
+                                                        │
+              ┌──────────────┬──────────────┬───────────┘
+              │              │              │
+     ┌────────▼───┐  ┌───────▼──────┐  ┌───▼────────┐
+     │ Neon PG    │  │  Cloudinary  │  │   BullMQ     │
+     │ (records)  │  │  (documents) │  │   (jobs)     │
+     └────────────┘  └──────────────┘  └───┬──────────┘
+                                            │
+                    ┌───────────────────────▼──────────┐
+                    │  BullMQ Worker (same repo)       │
+                    │  Multi-Agent AI · Groq LLM       │
+                    │  Agent 1 → 2 → 3 → 4 → 5       │
+                    └───────────────────────┬──────────┘
+                                            │
+                    ┌───────────────────────▼──────────┐
+                    │  AgentMail (inbound + outbound)  │
+                    │  maniranjan@agentmail.to         │
+                    └──────────────────────────────────┘
 ```
 
 ### Design Principles
@@ -720,7 +721,7 @@ Each phase delivers a working increment. 2–3 features per phase, ordered by de
 
 | # | Feature | Deliverable |
 |---|---------|-------------|
-| 1 | Admin login | Secure single-admin auth on Next.js + TypeScript API with JWT |
+| 1 | Admin login | Secure single-admin auth in Next.js (UI + API routes) with JWT |
 | 2 | Neon DB + Cloudinary | Schema design, COI record model, file upload to Cloudinary |
 | 3 | Basic COI dashboard | Upload COI, list all submissions, view document, basic status |
 
@@ -744,7 +745,7 @@ Each phase delivers a working increment. 2–3 features per phase, ordered by de
 
 **Exit criteria:** Email a COI to the inbox → job appears on dashboard → status updates as it processes.
 
-**Note:** Builds on existing `agent.py` AgentMail webhook pattern — migrated to TypeScript backend.
+**Note:** Builds on existing `agent.py` AgentMail webhook pattern — migrated to Next.js API routes in Phase 2.
 
 ---
 
@@ -885,8 +886,7 @@ ADMIN_PASSWORD_HASH=bcrypt_hash_here
 JWT_SECRET=your_jwt_secret
 
 # App
-PORT=8000
-NEXT_PUBLIC_API_URL=http://localhost:8000
+PORT=3000
 ```
 
 ### Run Locally
@@ -895,23 +895,16 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 # 1. Start Redis
 redis-server
 
-# 2. Backend API
-cd backend
+# 2. Next.js app (frontend + API routes)
 npm install
 npx prisma migrate dev
 npm run dev
 
-# 3. BullMQ Worker (separate terminal)
-cd backend
+# 3. BullMQ worker (separate terminal, same codebase)
 npm run worker
 
-# 4. Frontend (separate terminal)
-cd frontend
-npm install
-npm run dev
-
-# 5. AgentMail webhook tunnel (separate terminal)
-ngrok http --url=your-domain.ngrok-free.dev 8000
+# 4. AgentMail webhook tunnel (separate terminal)
+ngrok http --url=your-domain.ngrok-free.dev 3000
 ```
 
 ### Current Prototype
@@ -922,7 +915,7 @@ The `agent.py` file in this repo is a **Phase 2 prototype** that demonstrates:
 - Email receive → attachment save → AI reply via Groq
 - ngrok tunnel for webhook delivery
 
-This will be migrated to the TypeScript backend in Phase 2.
+This will be migrated to Next.js API routes in Phase 2.
 
 ---
 
@@ -930,31 +923,33 @@ This will be migrated to the TypeScript backend in Phase 2.
 
 ```
 coi-platform/
-├── frontend/                  # Next.js 15 app
-│   ├── app/
-│   │   ├── (auth)/login/      # Admin login page
-│   │   ├── dashboard/         # COI list, search, filter
-│   │   ├── coi/[id]/          # COI detail, versions, AI results
-│   │   ├── checklist/         # Editable checklist management
-│   │   ├── templates/         # Email template editor
-│   │   └── metrics/           # Compliance dashboard
-│   ├── components/            # shadcn/ui components
-│   └── lib/                   # API client, auth helpers
-│
-├── backend/                   # TypeScript API + workers
-│   ├── src/
-│   │   ├── routes/            # REST endpoints
-│   │   ├── webhooks/          # AgentMail webhook handler
-│   │   ├── workers/           # BullMQ job processors
-│   │   ├── agents/            # AI agent chain (1–5)
-│   │   ├── services/          # Cloudinary, email, checklist logic
-│   │   └── db/                # Prisma schema + migrations
-│   └── prisma/
-│       └── schema.prisma      # Neon PostgreSQL schema
-│
-├── agent.py                   # Phase 2 prototype (AgentMail + Groq)
-├── .env                       # Environment variables
-└── README.md                  # This file
+├── app/
+│   ├── (auth)/login/              # Admin login page
+│   ├── dashboard/                 # COI list, search, filter
+│   ├── coi/[id]/                  # COI detail, versions, AI results
+│   ├── checklist/                 # Editable checklist management
+│   ├── templates/                 # Email template editor
+│   ├── metrics/                   # Compliance dashboard
+│   └── api/                       # Backend API routes
+│       ├── auth/                  # Login, session
+│       ├── coi/                   # Upload, list, accept/reject
+│       ├── checklist/             # CRUD checklist items
+│       ├── templates/             # CRUD email templates
+│       └── webhooks/
+│           └── agentmail/         # AgentMail inbound webhook
+├── components/                    # shadcn/ui components
+├── lib/
+│   ├── workers/                   # BullMQ job processors
+│   ├── agents/                    # AI agent chain (1–5)
+│   ├── services/                  # Cloudinary, email, DB helpers
+│   └── auth.ts                    # JWT helpers
+├── prisma/
+│   └── schema.prisma              # Neon PostgreSQL schema
+├── scripts/
+│   └── worker.ts                  # BullMQ worker entry point
+├── agent.py                       # Phase 2 prototype (to be replaced)
+├── .env
+└── README.md
 ```
 
 ---
