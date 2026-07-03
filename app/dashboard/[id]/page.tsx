@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ExternalLink } from "lucide-react";
-import { getCoiDocumentById, COI_STATUS_LABELS } from "@/lib/services/coi";
+import { getCoiDocumentByIdWithLatestJob, COI_STATUS_LABELS } from "@/lib/services/coi";
+import { JOB_STATUS_LABELS } from "@/lib/constants/job-status";
 import { formatBytes, formatDate } from "@/lib/utils";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { JobStatusBadge } from "@/components/ui/job-status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -13,7 +15,7 @@ interface CoiDetailPageProps {
 
 export default async function CoiDetailPage({ params }: CoiDetailPageProps) {
   const { id } = await params;
-  const document = await getCoiDocumentById(id);
+  const document = await getCoiDocumentByIdWithLatestJob(id);
 
   if (!document) {
     notFound();
@@ -25,32 +27,40 @@ export default async function CoiDetailPage({ params }: CoiDetailPageProps) {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <Button asChild variant="ghost" size="sm" className="mb-1 h-7 px-0 text-xs">
+          <Button asChild variant="ghost" size="sm" className="mb-1 h-8 px-0 text-sm">
             <Link href="/dashboard">
               <ArrowLeft className="size-3" />
               Back to dashboard
             </Link>
           </Button>
-          <h1 className="text-xl font-semibold tracking-tight">
+          <h1 className="text-2xl font-semibold tracking-tight">
             {document.fileName}
           </h1>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-1 text-sm text-muted-foreground">
             Uploaded {formatDate(document.createdAt)}
           </p>
         </div>
-        <StatusBadge
-          status={document.status}
-          label={COI_STATUS_LABELS[document.status]}
-        />
+        <div className="flex flex-col items-end gap-2">
+          {document.latestJob ? (
+            <JobStatusBadge
+              status={document.latestJob.status}
+              label={JOB_STATUS_LABELS[document.latestJob.status]}
+            />
+          ) : null}
+          <StatusBadge
+            status={document.status}
+            label={COI_STATUS_LABELS[document.status]}
+          />
+        </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
         <Card className="gap-3 py-4">
           <CardHeader className="gap-1 px-4 pb-0">
-            <CardTitle className="text-base">Document details</CardTitle>
-            <CardDescription className="text-xs">Stored immutably in Cloudinary</CardDescription>
+            <CardTitle className="text-lg">Document details</CardTitle>
+            <CardDescription className="text-sm">Stored immutably in Cloudinary</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3 px-4 pb-4 text-xs">
+          <CardContent className="space-y-3 px-4 pb-4 text-sm">
             <div>
               <p className="text-muted-foreground">File name</p>
               <p className="font-medium">{document.fileName}</p>
@@ -82,8 +92,8 @@ export default async function CoiDetailPage({ params }: CoiDetailPageProps) {
 
         <Card className="gap-3 overflow-hidden py-4">
           <CardHeader className="gap-1 px-4 pb-0">
-            <CardTitle className="text-base">Document preview</CardTitle>
-            <CardDescription className="text-xs">
+            <CardTitle className="text-lg">Document preview</CardTitle>
+            <CardDescription className="text-sm">
               {isPdf ? "PDF preview" : "Image preview"}
             </CardDescription>
           </CardHeader>

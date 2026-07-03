@@ -20,8 +20,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`dark ${geistMono.variable}`}>
-      <body className="font-mono antialiased">
+    <html
+      lang="en"
+      className={`dark ${geistMono.variable}`}
+      suppressHydrationWarning
+    >
+      <body className="font-mono antialiased" suppressHydrationWarning>
         <TooltipProvider>{children}</TooltipProvider>
       </body>
     </html>

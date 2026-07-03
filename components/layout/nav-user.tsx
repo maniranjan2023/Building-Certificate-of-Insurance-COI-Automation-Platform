@@ -37,13 +37,13 @@ export function NavUser({ userEmail }: { userEmail: string }) {
               className="h-9 data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
               <Avatar className="h-6 w-6 rounded-md">
-                <AvatarFallback className="rounded-md text-[10px]">
+                <AvatarFallback className="rounded-md text-[11px]">
                   {getInitials(userEmail)}
                 </AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left leading-tight">
-                <span className="truncate text-xs font-medium">Admin</span>
-                <span className="truncate text-[10px] text-muted-foreground">
+                <span className="truncate text-sm font-medium">Admin</span>
+                <span className="truncate text-[11px] text-muted-foreground">
                   {userEmail}
                 </span>
               </div>
@@ -51,7 +51,7 @@ export function NavUser({ userEmail }: { userEmail: string }) {
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent
-            className="w-[--radix-dropdown-menu-trigger-width] min-w-48 rounded-lg text-xs"
+            className="w-[--radix-dropdown-menu-trigger-width] min-w-48 rounded-lg text-sm"
             side={isMobile ? "bottom" : "right"}
             align="end"
             sideOffset={4}
@@ -59,20 +59,20 @@ export function NavUser({ userEmail }: { userEmail: string }) {
             <DropdownMenuLabel className="p-0 font-normal">
               <div className="flex items-center gap-2 px-2 py-1.5 text-left">
                 <Avatar className="h-6 w-6 rounded-md">
-                  <AvatarFallback className="rounded-md text-[10px]">
+                  <AvatarFallback className="rounded-md text-[11px]">
                     {getInitials(userEmail)}
                   </AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 leading-tight">
-                  <span className="truncate text-xs font-medium">Admin</span>
-                  <span className="truncate text-[10px] text-muted-foreground">
+                  <span className="truncate text-sm font-medium">Admin</span>
+                  <span className="truncate text-[11px] text-muted-foreground">
                     {userEmail}
                   </span>
                 </div>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleLogout} className="text-xs">
+            <DropdownMenuItem onClick={handleLogout} className="text-sm">
               <LogOut className="size-3.5" />
               Sign out
             </DropdownMenuItem>
@@ -93,8 +93,8 @@ export function SidebarBrand() {
               <ShieldCheck className="size-3.5" />
             </div>
             <div className="grid flex-1 text-left leading-tight">
-              <span className="truncate text-xs font-semibold">COI Platform</span>
-              <span className="truncate text-[10px] text-muted-foreground">
+              <span className="truncate text-sm font-semibold">COI Platform</span>
+              <span className="truncate text-[11px] text-muted-foreground">
                 Compliance automation
               </span>
             </div>

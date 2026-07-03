@@ -1,33 +1,81 @@
-generator client {
-  provider = "prisma-client-js"
-}
-
-datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
-}
-
-enum CoiStatus {
-  PENDING_REVIEW
-  ACCEPTED
-  REJECTED
-  EXPIRING_SOON
-  EXPIRED
-}
-
-model CoiDocument {
-  id                 String    @id @default(cuid())
-  fileName           String
-  cloudinaryUrl      String
-  cloudinaryPublicId String
-  mimeType           String
-  fileSizeBytes      Int
-  status             CoiStatus @default(PENDING_REVIEW)
-  notes              String?
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
-
-  @@index([status])
-  @@index([createdAt])
-}
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum CoiStatus {
+  PENDING_REVIEW
+  ACCEPTED
+  REJECTED
+  EXPIRING_SOON
+  EXPIRED
+}
+
+enum IntakeSource {
+  DASHBOARD
+  EMAIL
+}
+
+enum JobStatus {
+  QUEUED
+  PROCESSING
+  READY_FOR_REVIEW
+  FAILED
+  DLQ
+}
+
+enum JobType {
+  PROCESS_COI
+  SEND_TEMPLATE_EMAIL
+  SEND_REMINDER
+}
+
+model CoiDocument {
+  id                 String       @id @default(cuid())
+  fileName           String
+  cloudinaryUrl      String
+  cloudinaryPublicId String
+  mimeType           String
+  fileSizeBytes      Int
+  status             CoiStatus    @default(PENDING_REVIEW)
+  intakeSource       IntakeSource @default(DASHBOARD)
+  senderEmail        String?
+  notes              String?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  jobs               CoiJob[]
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([senderEmail])
+}
+
+model CoiJob {
+  id            String      @id @default(cuid())
+  coiDocumentId String
+  coiDocument   CoiDocument @relation(fields: [coiDocumentId], references: [id], onDelete: Cascade)
+  bullmqJobId   String?
+  queueName     String
+  type          JobType     @default(PROCESS_COI)
+  status        JobStatus   @default(QUEUED)
+  attempts      Int         @default(0)
+  failureReason String?
+  dlqJobId      String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([status])
+  @@index([coiDocumentId])
+  @@index([createdAt])
+}
+
+model ProcessedWebhookEvent {
+  messageId String   @id
+  createdAt DateTime @default(now())
+}
+

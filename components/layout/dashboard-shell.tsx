@@ -21,10 +21,11 @@ export function DashboardShell({ children, userEmail }: DashboardShellProps) {
   const pageTitle =
     dashboardNavigation
       .flatMap((section) => section.items)
+      .filter((item) => item.enabled)
+      .sort((a, b) => b.href.length - a.href.length)
       .find(
         (item) =>
-          item.enabled &&
-          (pathname === item.href || pathname.startsWith(`${item.href}/`))
+          pathname === item.href || pathname.startsWith(`${item.href}/`)
       )?.label ?? "Dashboard";
 
   return (
@@ -39,13 +40,13 @@ export function DashboardShell({ children, userEmail }: DashboardShellProps) {
           />
           <div className="flex flex-1 items-center justify-between gap-3">
             <div>
-              <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
                 Workspace
               </p>
-              <h1 className="text-base font-semibold tracking-tight">{pageTitle}</h1>
+              <h1 className="text-lg font-semibold tracking-tight">{pageTitle}</h1>
             </div>
-            <div className="hidden rounded border bg-muted/40 px-2 py-0.5 text-[10px] font-medium text-muted-foreground sm:block">
-              Phase 1
+            <div className="hidden rounded border bg-muted/40 px-2 py-0.5 text-[11px] font-medium text-muted-foreground sm:block">
+              Phase 2
             </div>
           </div>
         </header>

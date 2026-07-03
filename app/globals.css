@@ -102,9 +102,9 @@
 }
 
 html {
-  font-size: 14px;
+  font-size: 15px;
 }
 
 body {
-  @apply bg-background font-mono text-sm text-foreground antialiased;
+  @apply bg-background font-mono text-base text-foreground antialiased;
 }
