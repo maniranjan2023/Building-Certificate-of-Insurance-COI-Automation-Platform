@@ -51,7 +51,7 @@ export function LoginForm() {
         </div>
         <div>
           <CardTitle className="text-lg">Admin sign in</CardTitle>
-          <CardDescription className="text-xs">
+          <CardDescription className="text-sm">
             COI Compliance Automation Platform
           </CardDescription>
         </div>
@@ -59,11 +59,11 @@ export function LoginForm() {
       <CardContent className="p-4 pt-0">
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="space-y-1.5">
-            <Label htmlFor="email" className="text-xs">Email</Label>
+            <Label htmlFor="email" className="text-sm">Email</Label>
             <Input
               id="email"
               type="email"
-              className="h-8 text-xs"
+              className="h-9 text-sm"
               autoComplete="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
@@ -71,11 +71,11 @@ export function LoginForm() {
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="password" className="text-xs">Password</Label>
+            <Label htmlFor="password" className="text-sm">Password</Label>
             <Input
               id="password"
               type="password"
-              className="h-8 text-xs"
+              className="h-9 text-sm"
               autoComplete="current-password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
@@ -84,7 +84,7 @@ export function LoginForm() {
           </div>
 
           {error ? (
-            <p className="rounded-md border border-destructive/30 bg-destructive/10 px-2.5 py-1.5 text-xs text-destructive">
+            <p className="rounded-md border border-destructive/30 bg-destructive/10 px-2.5 py-1.5 text-sm text-destructive">
               {error}
             </p>
           ) : null}

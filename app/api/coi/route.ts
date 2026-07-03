@@ -1,8 +1,9 @@
 import {
   CoiValidationError,
-  createCoiFromUpload,
+  createCoiFromUploadWithJob,
   listCoiDocuments,
 } from "@/lib/services/coi";
+import { CloudinaryUploadError } from "@/lib/services/cloudinary";
 import { jsonError, jsonOk } from "@/lib/api-response";
 
 export async function GET() {
@@ -25,11 +26,15 @@ export async function POST(request: Request) {
       return jsonError("A COI file is required.");
     }
 
-    const document = await createCoiFromUpload(file);
-    return jsonOk(document, { status: 201 });
+    const { document, job } = await createCoiFromUploadWithJob(file);
+    return jsonOk({ document, job }, { status: 201 });
   } catch (error) {
     if (error instanceof CoiValidationError) {
       return jsonError(error.message, 400);
+    }
+
+    if (error instanceof CloudinaryUploadError) {
+      return jsonError(error.message, 502);
     }
 
     const message =
