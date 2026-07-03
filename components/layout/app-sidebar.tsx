@@ -30,7 +30,7 @@ export function AppSidebar({ userEmail }: { userEmail: string }) {
       <SidebarContent className="gap-1 px-1">
         {dashboardNavigation.map((section) => (
           <SidebarGroup key={section.title} className="p-1">
-            <SidebarGroupLabel className="h-6 px-2 text-[10px] uppercase tracking-wider">
+            <SidebarGroupLabel className="h-6 px-2 text-[11px] uppercase tracking-wider">
               {section.title}
             </SidebarGroupLabel>
             <SidebarGroupContent>
@@ -40,7 +40,8 @@ export function AppSidebar({ userEmail }: { userEmail: string }) {
                   const isActive =
                     item.enabled &&
                     (pathname === item.href ||
-                      pathname.startsWith(`${item.href}/`));
+                      (item.href !== "/dashboard" &&
+                        pathname.startsWith(`${item.href}/`)));
 
                   return (
                     <SidebarMenuItem key={item.href}>
@@ -53,7 +54,7 @@ export function AppSidebar({ userEmail }: { userEmail: string }) {
                         >
                           <Link href={item.href}>
                             <Icon className="size-3.5" />
-                            <span className="text-xs">{item.label}</span>
+                            <span className="text-sm">{item.label}</span>
                           </Link>
                         </SidebarMenuButton>
                       ) : (
@@ -63,11 +64,11 @@ export function AppSidebar({ userEmail }: { userEmail: string }) {
                           tooltip={item.label}
                         >
                           <Icon className="size-3.5" />
-                          <span className="text-xs">{item.label}</span>
+                          <span className="text-sm">{item.label}</span>
                         </SidebarMenuButton>
                       )}
                       {item.badge ? (
-                        <SidebarMenuBadge className="text-[10px]">
+                        <SidebarMenuBadge className="text-[11px]">
                           {item.badge}
                         </SidebarMenuBadge>
                       ) : null}
