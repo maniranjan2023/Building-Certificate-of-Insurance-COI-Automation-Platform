@@ -2,6 +2,7 @@ import {
   BarChart3,
   ClipboardCheck,
   LayoutDashboard,
+  ListTodo,
   Mail,
   type LucideIcon,
 } from "lucide-react";
@@ -29,6 +30,13 @@ export const dashboardNavigation: NavSection[] = [
         label: "COI Dashboard",
         description: "Uploads & submissions",
         icon: LayoutDashboard,
+        enabled: true,
+      },
+      {
+        href: "/dashboard/jobs",
+        label: "Job Queue",
+        description: "BullMQ status & DLQ",
+        icon: ListTodo,
         enabled: true,
       },
     ],

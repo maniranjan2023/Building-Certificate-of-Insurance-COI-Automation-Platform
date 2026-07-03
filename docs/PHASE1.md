@@ -58,11 +58,11 @@ curl http://localhost:3000/api/coi
 ## What is deferred to Phase 2+
 
 - AgentMail webhook intake
-- BullMQ job queue
+- BullMQ job queue (`coi-jobs`, `coi-jobs-dlq`, `reminder-jobs`, `reminder-jobs-dlq` — see README)
 - Checklist editor & COI versioning
 - AI agent pipeline
 - Email templates & auto-send
-- Metrics & expiry reminders
+- Metrics & expiry reminders (node-cron schedules at 30/14/7/3 days → BullMQ worker sends email)
 
 ## Troubleshooting
 

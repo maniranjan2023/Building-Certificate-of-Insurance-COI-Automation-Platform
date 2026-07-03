@@ -144,7 +144,7 @@ Someone opens each PDF by hand  →       AI reads, extracts, and validates
 Checklist in someone's head     →       Editable checklist enforced on every doc
 Vague rejection emails            →       Specific deficiency emails (editable templates)
 Re-submissions get lost           →       Version history per tenant (v1, v2, v3…)
-Nobody tracks expiry              →       Auto reminders at 30 / 15 / 7 days
+Nobody tracks expiry              →       node-cron schedules reminders at 30 / 14 / 7 / 3 days (BullMQ sends email)
 No compliance visibility          →       Live dashboard with metrics and audit trail
 ```
 
@@ -157,7 +157,7 @@ No compliance visibility          →       Live dashboard with metrics and audi
 | Inconsistent review standards | Same editable checklist applied to every COI — no human variance in what gets checked |
 | Vague rejection emails | Editable email templates with exact missing items, rejection reasons, and policy details |
 | Re-submissions treated as new cases | COI versioning per sender — v1 rejected, v2 re-uploaded, full history and comparison |
-| No expiry tracking | AI extracts expiry date; automatic renewal reminders; expired COIs flagged non-compliant |
+| No expiry tracking | AI extracts expiry date; **node-cron** detects due reminders at 30/14/7/3 days; **BullMQ worker** sends emails; expired COIs flagged non-compliant |
 | No audit trail | Every upload, AI step, email, and admin decision logged with timestamps |
 | No portfolio visibility | Metrics dashboard — compliance %, expiring soon, ROI, turnaround time |
 
@@ -247,7 +247,7 @@ That's **Version 2** (not a new case). Full history per sender. Compare what cha
 
 ### Renewal
 
-AI extracts expiry date. Automatic reminders at **30, 15, and 7 days**. Expired COIs flagged **non-compliant** until a new version is accepted.
+AI extracts expiry date. **node-cron** runs daily, finds COIs due for reminders at **30, 14, 7, and 3 days** before expiry, and enqueues **BullMQ** `send-reminder` jobs. The worker delivers emails via AgentMail (with retries). Expired COIs flagged **non-compliant** until a new version is accepted.
 
 ---
 
@@ -313,15 +313,30 @@ Each checklist item contains:
 
 ### 6. BullMQ Job Processing
 
-- Unified queue for **dashboard upload** and **email intake**
-- Same job type, same pipeline, regardless of source
-- Job statuses:
-  - **Queued** — Waiting to be picked up
-  - **Processing** — AI agent chain running
-  - **Ready for Review** — AI complete, awaiting admin
-  - **Failed** — Error occurred, can be retried
-- Failed jobs retried automatically
-- Real-time status visible on dashboard
+BullMQ is the **async worker layer** backed by **Redis**. See [Queue & Reliability Specification](#queue--reliability-specification) for queue names, retries, and DLQ rules.
+
+| Job type | Queue | Triggered by | What it does |
+|----------|-------|--------------|--------------|
+| `process-coi` | `coi-jobs` | Dashboard upload or AgentMail webhook | Cloudinary → AI agent chain (Phase 4) → update status |
+| `send-template-email` | `coi-jobs` | Admin accept/reject, intake events (Phase 5) | Send templated outbound email via AgentMail |
+| `send-reminder` | `reminder-jobs` | **node-cron** daily expiry scan (Phase 6) | Send renewal reminder email via AgentMail |
+
+**Job statuses (stored in Neon `CoiJob`):**
+- **Queued** — Waiting in Redis to be picked up
+- **Processing** — Worker is running
+- **Ready for Review** — AI complete (Phase 4+), awaiting admin
+- **Failed** — Retrying with exponential backoff
+- **DLQ** — Max retries exceeded; in dead-letter queue for human inspection
+
+**Reliability (all main queues):**
+- Exponential backoff retries (default: 5 attempts, 5s base delay)
+- Failed jobs routed to matching DLQ after final attempt
+- Real-time status visible on dashboard (Phase 2+)
+
+**Email jobs (`send-reminder`, `send-template-email`):**
+- Picked up by BullMQ worker(s) — same process can listen to both `coi-jobs` and `reminder-jobs`
+- Retries on AgentMail delivery failure; DLQ on exhaustion
+- Logged in audit trail (template, recipient, timestamp)
 
 ### 7. AgentMail Email Intake
 
@@ -364,7 +379,7 @@ Admin-editable templates with defined placeholders for every scenario. Preview w
 | **All Matched — Awaiting Review** | Checklist passed — waiting for admin decision |
 | **Approved** | Admin accepted — includes matched checklist summary |
 | **Rejected** | Admin rejected — includes rejection reason + deficient items |
-| **Renewal Reminder** | 30 / 15 / 7 days before expiry — policy details + resubmit instructions |
+| **Renewal Reminder** | 30 / 14 / 7 / 3 days before expiry — policy details + resubmit instructions (node-cron enqueues → BullMQ worker sends) |
 | **Processing Error** | Job failed — notify sender of delay |
 
 **Available placeholders:**
@@ -387,10 +402,15 @@ Admin-editable templates with defined placeholders for every scenario. Preview w
 ### 11. Expiry & Renewal Engine
 
 - Expiry date extracted by AI from each accepted COI
-- Scheduled reminders at **30, 15, and 7 days** before expiry
-- Uses **Renewal Reminder** email template with full policy details
+- **node-cron** runs a daily scheduled task that scans the database for COIs expiring in **30, 14, 7, or 3 days**
+- For each match, cron **enqueues `send-reminder` on `reminder-jobs`** (does not send email directly; never uses `coi-jobs`)
+- **BullMQ worker** picks up from `reminder-jobs`, renders **Renewal Reminder** template, sends via AgentMail
+- On max retries → `reminder-jobs-dlq` for human inspection
+- **ReminderLog** table prevents duplicate reminders for the same COI + day-offset
 - Expired COIs marked **non-compliant**
 - Non-compliant until new version uploaded and accepted by admin
+
+> **Note:** **node-cron** decides *who* needs a reminder and enqueues to **`reminder-jobs`**; **BullMQ worker** sends the email. Cron never calls AgentMail directly.
 
 ### 12. Metrics Dashboard
 
@@ -626,10 +646,86 @@ Before counting risk reduction from missed expiries
 | **Database** | Neon PostgreSQL | COI records, versions, checklist, templates, audit logs, metrics |
 | **ORM** | Prisma or Drizzle | Schema management, migrations, type-safe queries |
 | **File Storage** | Cloudinary | Immutable COI originals, secure URLs, PDF delivery |
-| **Job Queue** | BullMQ + Redis | Async AI processing (worker runs as separate process from same codebase) |
+| **Job Queue** | BullMQ + Redis | Four queues: `coi-jobs`, `coi-jobs-dlq`, `reminder-jobs`, `reminder-jobs-dlq` |
+| **Scheduler** | node-cron (daily) | Scans expiry dates → enqueues to `reminder-jobs` only (never sends email directly) |
 | **AI** | OpenAI SDK → Groq LLM | Multi-agent sequential pipeline |
 | **Email** | AgentMail (`maniranjan@agentmail.to`) | Inbound COI intake + outbound templated replies |
 | **Auth** | JWT (via Next.js API routes) | Single admin session |
+
+---
+
+## Queue & Reliability Specification
+
+Implementation reference for Phases 2–6. **Redis** stores jobs; **BullMQ** manages queues, workers, retries, and DLQ routing.
+
+### Queue layout (4 queues)
+
+| Queue | Purpose | Job types |
+|-------|---------|-----------|
+| **`coi-jobs`** | COI intake, AI processing, templated emails | `process-coi`, `send-template-email` |
+| **`coi-jobs-dlq`** | Failed COI jobs after max retries | Human inspection + manual retry |
+| **`reminder-jobs`** | Renewal reminder emails only | `send-reminder` |
+| **`reminder-jobs-dlq`** | Failed reminder jobs after max retries | Human inspection + manual retry |
+
+**Why separate reminder queue?** Isolates daily reminder traffic from heavy COI/AI work; independent monitoring and scaling.
+
+```
+Dashboard / Webhook  ──►  coi-jobs  ──►  worker
+                               │ fail (max retries)
+                               ▼
+                         coi-jobs-dlq
+
+node-cron (daily)    ──►  reminder-jobs  ──►  worker
+                               │ fail (max retries)
+                               ▼
+                         reminder-jobs-dlq
+```
+
+### Retry policy (exponential backoff)
+
+Applied to all jobs enqueued on `coi-jobs` and `reminder-jobs`:
+
+```ts
+{
+  attempts: 5,
+  backoff: { type: 'exponential', delay: 5000 },  // 5s → 10s → 20s → 40s → 80s
+  removeOnComplete: 100,
+  removeOnFail: false,
+}
+```
+
+Configurable via environment variables (see [Environment Variables](#environment-variables)).
+
+### Dead Letter Queue (DLQ) flow
+
+1. Job fails in worker → BullMQ retries with exponential backoff
+2. After **final attempt** → move to matching DLQ (`coi-jobs-dlq` or `reminder-jobs-dlq`)
+3. Update Neon `CoiJob` status → `DLQ`, store `failureReason` and `dlqJobId`
+4. Dashboard shows failed/DLQ jobs for admin inspection
+5. Admin can **retry from DLQ** (re-enqueue to main queue) — Phase 2+
+
+### Idempotency
+
+| Scenario | Mechanism |
+|----------|-----------|
+| AgentMail webhook duplicate | Dedup by `messageId` in Redis or DB before enqueue |
+| Reminder duplicate | `ReminderLog` in Postgres (`coiId` + `daysBefore` unique) |
+| Cron runs twice | Redis distributed lock during daily scan (Phase 6) |
+
+### npm packages (Phase 2+)
+
+```bash
+npm install bullmq ioredis agentmail
+npm install node-cron    # Phase 6
+```
+
+### Processes to run
+
+| Process | Command | Phase |
+|---------|---------|-------|
+| Next.js app | `npm run dev` | 1+ |
+| BullMQ worker | `npm run worker` | 2+ |
+| node-cron scheduler | `npm run cron` | 6 |
 
 ---
 
@@ -649,26 +745,37 @@ Before counting risk reduction from missed expiries
                                                         │
               ┌──────────────┬──────────────┬───────────┘
               │              │              │
-     ┌────────▼───┐  ┌───────▼──────┐  ┌───▼────────┐
-     │ Neon PG    │  │  Cloudinary  │  │   BullMQ     │
-     │ (records)  │  │  (documents) │  │   (jobs)     │
-     └────────────┘  └──────────────┘  └───┬──────────┘
+     ┌────────▼───┐  ┌───────▼──────┐  ┌───▼────────────────────────┐
+     │ Neon PG    │  │  Cloudinary  │  │   Redis / BullMQ           │
+     │ (records)  │  │  (documents) │  │   coi-jobs · coi-jobs-dlq    │
+     └────────────┘  └──────────────┘  │   reminder-jobs · reminder-dlq│
+                                         └───┬────────────────────────┘
                                             │
                     ┌───────────────────────▼──────────┐
                     │  BullMQ Worker (same repo)       │
-                    │  Multi-Agent AI · Groq LLM       │
-                    │  Agent 1 → 2 → 3 → 4 → 5       │
+                    │  coi-jobs: process-coi ·         │
+                    │            send-template-email   │
+                    │  reminder-jobs: send-reminder    │
                     └───────────────────────┬──────────┘
                                             │
                     ┌───────────────────────▼──────────┐
                     │  AgentMail (inbound + outbound)  │
                     │  maniranjan@agentmail.to         │
                     └──────────────────────────────────┘
+
+                    ┌──────────────────────────────────┐
+                    │  node-cron (daily, Phase 6)      │
+                    │  Scan expiry → enqueue to        │
+                    │  reminder-jobs (not coi-jobs)    │
+                    └──────────────────────────────────┘
 ```
 
 ### Design Principles
 
-- **Single pipeline** — email and dashboard intake converge at BullMQ; no duplicate logic
+- **Cron schedules, BullMQ executes** — node-cron enqueues to `reminder-jobs`; worker sends via AgentMail
+- **Queue isolation** — COI processing (`coi-jobs`) separate from reminders (`reminder-jobs`)
+- **Exponential backoff + DLQ** — failed jobs retry automatically; exhausted jobs go to DLQ for human inspection
+- **Single intake pipeline** — email and dashboard upload converge at `coi-jobs` `process-coi`; no duplicate logic
 - **Immutable documents** — Cloudinary stores originals; new versions are new uploads, not overwrites
 - **Human-in-the-loop** — AI recommends; admin decides; tenants are never auto-accepted without review
 - **Audit everything** — every agent step, email, and decision is logged with timestamp
@@ -682,9 +789,9 @@ Before counting risk reduction from missed expiries
    Email (AgentMail webhook) ──┐
                                ├──► Create COI record in Neon
    Dashboard upload ───────────┘    Upload file to Cloudinary
-                                    Enqueue BullMQ job
+                                    Enqueue coi-jobs (process-coi)
 
-2. PROCESSING (BullMQ Worker)
+2. PROCESSING (BullMQ Worker — coi-jobs)
    Job picked up ──► Agent 1 (Document/OCR)
                  ──► Agent 2 (Extraction)
                  ──► Agent 3 (Checklist)
@@ -692,20 +799,92 @@ Before counting risk reduction from missed expiries
                  ──► Agent 5 (Report)
                  ──► Save all outputs to Neon
                  ──► Update status: Ready for Review
-                 ──► Send "Awaiting Review" or "Items Missing" email
+                 ──► Enqueue coi-jobs (send-template-email)
 
 3. ADMIN REVIEW
    Admin views AI results ──► Accept or Reject with reason
-                          ──► Send Approved or Rejected email
+                          ──► Enqueue coi-jobs (send-template-email: Approved / Rejected)
                           ──► Update COI status
                           ──► Log decision in audit trail
 
-4. RENEWAL (Scheduled Jobs)
-   Daily cron ──► Check expiry dates
-              ──► Send 30/15/7 day reminders
-              ──► Mark expired COIs as non-compliant
-              ──► Update metrics dashboard
+4. RENEWAL (node-cron + BullMQ — Phase 6)
+   Daily node-cron ──► Scan DB for COIs expiring in 30 / 14 / 7 / 3 days
+                   ──► Enqueue reminder-jobs (send-reminder) per match
+   BullMQ worker  ──► Send Renewal Reminder via AgentMail (exponential backoff)
+                   ──► On max retries → reminder-jobs-dlq
+                   ──► Log in ReminderLog (idempotent — no duplicate sends)
+                   ──► Mark expired COIs as non-compliant
+                   ──► Update metrics dashboard
 ```
+
+---
+
+## Implementation Reference
+
+Spec for building each phase. Runbooks: `docs/PHASE1.md`, `docs/PHASE2.md`, etc.
+
+### Database schema by phase
+
+**Phase 1 (implemented)** — `CoiDocument`
+
+**Phase 2** — add `CoiJob`:
+
+```prisma
+enum JobStatus {
+  QUEUED
+  PROCESSING
+  READY_FOR_REVIEW
+  FAILED
+  DLQ
+}
+
+enum JobType {
+  PROCESS_COI
+  SEND_TEMPLATE_EMAIL
+  SEND_REMINDER
+}
+
+model CoiJob {
+  id            String    @id @default(cuid())
+  coiDocumentId String
+  coiDocument   CoiDocument @relation(fields: [coiDocumentId], references: [id])
+  bullmqJobId   String?
+  queueName     String    // coi-jobs | reminder-jobs
+  type          JobType
+  status        JobStatus @default(QUEUED)
+  attempts      Int       @default(0)
+  failureReason String?
+  dlqJobId      String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+```
+
+**Phase 3** — `Sender`, `CoiVersion` (link `CoiJob` → version)
+
+**Phase 4** — `AiRun`, `AgentStep`, extracted fields JSON
+
+**Phase 5** — `EmailTemplate`, `OutboundEmail`
+
+**Phase 6** — `ReminderLog` (`coiDocumentId`, `daysBefore`, `sentAt` — unique per pair)
+
+### API routes by phase
+
+| Route | Phase | Purpose |
+|-------|-------|---------|
+| `POST /api/auth/login` | 1 | Admin sign-in |
+| `GET/POST /api/coi` | 1–2 | List / upload (Phase 2: enqueue `coi-jobs`) |
+| `GET /api/coi/[id]` | 1 | COI detail |
+| `POST /api/webhooks/agentmail` | 2 | AgentMail `message.received` → Neon + Cloudinary + enqueue |
+| `GET /api/jobs` | 2 | List jobs with status |
+| `GET /api/jobs/dlq` | 2 | List DLQ jobs (COI + reminder) |
+| `POST /api/jobs/dlq/[id]/retry` | 2 | Manual retry from DLQ |
+| `CRUD /api/checklist` | 3 | Checklist items |
+| `GET/POST /api/coi/[id]/versions` | 3 | Version history |
+| `POST /api/coi/[id]/accept` | 5 | Accept + enqueue template email |
+| `POST /api/coi/[id]/reject` | 5 | Reject + enqueue template email |
+| `CRUD /api/templates` | 5 | Email templates |
+| `GET /api/metrics` | 6 | Compliance dashboard data |
 
 ---
 
@@ -738,14 +917,23 @@ Each phase delivers a working increment. 2–3 features per phase, ordered by de
 | # | Feature | Deliverable |
 |---|---------|-------------|
 | 1 | AgentMail webhook | `maniranjan@agentmail.to` receives emails + attachments → Neon + Cloudinary |
-| 2 | BullMQ pipeline | Dashboard upload and email intake both enqueue the same job type |
-| 3 | Job status UI | Real-time Queued / Processing / Ready / Failed on dashboard |
+| 2 | BullMQ pipeline | Dashboard upload and email intake both enqueue `process-coi` on `coi-jobs` |
+| 3 | Job status UI | Queued / Processing / Ready / Failed / DLQ on dashboard |
+| 4 | Exponential backoff | Shared retry config on all `coi-jobs` enqueues (5 attempts, 5s base) |
+| 5 | Dead Letter Queue | Failed jobs → `coi-jobs-dlq`; dashboard DLQ view + optional manual retry |
+| 6 | Stub worker | Worker simulates Processing → Ready (full AI in Phase 4) |
 
-**Problem solved:** Tenants can email COIs directly. Both intake channels feed one reliable processing queue.
+**Problem solved:** Tenants can email COIs directly. Both intake channels feed one reliable processing queue with production-grade failure handling.
 
-**Exit criteria:** Email a COI to the inbox → job appears on dashboard → status updates as it processes.
+**Exit criteria:**
+- Email a COI to the inbox → COI record + job on dashboard → status updates
+- Dashboard upload enqueues `coi-jobs` (same path as webhook)
+- Force worker failure → see exponential retries in logs
+- After max attempts → job in `coi-jobs-dlq` + visible on dashboard
 
-**Note:** Builds on existing `agent.py` AgentMail webhook pattern — migrated to Next.js API routes in Phase 2.
+**Key files:** `app/api/webhooks/agentmail/`, `lib/queue/`, `lib/workers/`, `scripts/worker.ts`, `docs/PHASE2.md`
+
+**Note:** Builds on existing `agent.py` AgentMail webhook pattern — migrated to Next.js API routes + `agentmail` npm SDK.
 
 ---
 
@@ -803,7 +991,7 @@ Each phase delivers a working increment. 2–3 features per phase, ordered by de
 
 | # | Feature | Deliverable |
 |---|---------|-------------|
-| 1 | Expiry + renewal reminders | 30/15/7 day scheduled emails with policy details via renewal template |
+| 1 | Expiry + renewal reminders | node-cron → `reminder-jobs` at 30/14/7/3 days; worker sends via AgentMail; failures → `reminder-jobs-dlq` |
 | 2 | Metrics dashboard | Compliance %, ROI, savings, turnaround, automation % with live calculations |
 | 3 | Full audit log | Immutable files, agent steps, emails, decisions, checklist/template changes |
 
@@ -818,9 +1006,9 @@ Each phase delivers a working increment. 2–3 features per phase, ordered by de
 ```
 Phase 1          Phase 2          Phase 3          Phase 4          Phase 5          Phase 6
 ────────         ────────         ────────         ────────         ────────         ────────
-Admin Login      AgentMail        Editable         Document/OCR     Accept/Reject    Expiry
-Neon +           Webhook          Checklist        Agent            + Email          Reminders
-Cloudinary       BullMQ Queue     COI Versioning   Extract +        Templates        Metrics
+Admin Login      AgentMail        Editable         Document/OCR     Accept/Reject    node-cron →
+Neon +           Webhook          Checklist        Agent            + Email          reminder-jobs
+Cloudinary       coi-jobs + DLQ   COI Versioning   Extract +        Templates        Metrics
 Basic Dashboard  Job Status UI    Job Linking      Checklist Agents Auto-send        Audit Log
                                                      Risk + Report
                                                      Agents
@@ -867,8 +1055,17 @@ CLOUDINARY_CLOUD_NAME=your_cloud_name
 CLOUDINARY_API_KEY=your_api_key
 CLOUDINARY_API_SECRET=your_api_secret
 
-# Redis / BullMQ
+# Redis / BullMQ (Phase 2+)
 REDIS_URL=redis://localhost:6379
+BULLMQ_COI_QUEUE=coi-jobs
+BULLMQ_COI_DLQ=coi-jobs-dlq
+BULLMQ_REMINDER_QUEUE=reminder-jobs
+BULLMQ_REMINDER_DLQ=reminder-jobs-dlq
+JOB_MAX_ATTEMPTS=5
+JOB_BACKOFF_DELAY_MS=5000
+
+# Scheduler (Phase 6)
+CRON_SCHEDULE=0 9 * * *
 
 # AI (Groq via OpenAI SDK)
 GROQ_API_KEY=gsk_xxx
@@ -900,10 +1097,13 @@ npm install
 npx prisma migrate dev
 npm run dev
 
-# 3. BullMQ worker (separate terminal, same codebase)
+# 3. BullMQ worker — coi-jobs + reminder-jobs (separate terminal)
 npm run worker
 
-# 4. AgentMail webhook tunnel (separate terminal)
+# 4. node-cron — enqueues reminder-jobs only (separate terminal, Phase 6)
+npm run cron
+
+# 5. AgentMail webhook tunnel (separate terminal)
 ngrok http --url=your-domain.ngrok-free.dev 3000
 ```
 
@@ -933,20 +1133,27 @@ coi-platform/
 │   └── api/                       # Backend API routes
 │       ├── auth/                  # Login, session
 │       ├── coi/                   # Upload, list, accept/reject
+│       ├── jobs/                  # Job list, DLQ, retry (Phase 2)
 │       ├── checklist/             # CRUD checklist items
 │       ├── templates/             # CRUD email templates
 │       └── webhooks/
 │           └── agentmail/         # AgentMail inbound webhook
 ├── components/                    # shadcn/ui components
 ├── lib/
-│   ├── workers/                   # BullMQ job processors
+│   ├── queue/                     # Redis connection, queue definitions, enqueue helpers
+│   ├── workers/                   # process-coi, send-template-email, send-reminder handlers
+│   ├── cron/                      # node-cron expiry scan → reminder-jobs (Phase 6)
 │   ├── agents/                    # AI agent chain (1–5)
 │   ├── services/                  # Cloudinary, email, DB helpers
 │   └── auth.ts                    # JWT helpers
 ├── prisma/
 │   └── schema.prisma              # Neon PostgreSQL schema
+├── docs/
+│   ├── PHASE1.md                  # Phase 1 run & verify
+│   └── PHASE2.md                  # Phase 2 run & verify
 ├── scripts/
-│   └── worker.ts                  # BullMQ worker entry point
+│   ├── worker.ts                  # BullMQ worker (coi-jobs + reminder-jobs)
+│   └── cron.ts                    # node-cron entry (enqueue reminder-jobs only)
 ├── agent.py                       # Phase 2 prototype (to be replaced)
 ├── .env
 └── README.md
