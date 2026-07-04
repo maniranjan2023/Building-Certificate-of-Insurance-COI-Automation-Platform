@@ -1,81 +1,127 @@
-generator client {
-  provider = "prisma-client-js"
-}
-
-datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
-}
-
-enum CoiStatus {
-  PENDING_REVIEW
-  ACCEPTED
-  REJECTED
-  EXPIRING_SOON
-  EXPIRED
-}
-
-enum IntakeSource {
-  DASHBOARD
-  EMAIL
-}
-
-enum JobStatus {
-  QUEUED
-  PROCESSING
-  READY_FOR_REVIEW
-  FAILED
-  DLQ
-}
-
-enum JobType {
-  PROCESS_COI
-  SEND_TEMPLATE_EMAIL
-  SEND_REMINDER
-}
-
-model CoiDocument {
-  id                 String       @id @default(cuid())
-  fileName           String
-  cloudinaryUrl      String
-  cloudinaryPublicId String
-  mimeType           String
-  fileSizeBytes      Int
-  status             CoiStatus    @default(PENDING_REVIEW)
-  intakeSource       IntakeSource @default(DASHBOARD)
-  senderEmail        String?
-  notes              String?
-  createdAt          DateTime     @default(now())
-  updatedAt          DateTime     @updatedAt
-  jobs               CoiJob[]
-
-  @@index([status])
-  @@index([createdAt])
-  @@index([senderEmail])
-}
-
-model CoiJob {
-  id            String      @id @default(cuid())
-  coiDocumentId String
-  coiDocument   CoiDocument @relation(fields: [coiDocumentId], references: [id], onDelete: Cascade)
-  bullmqJobId   String?
-  queueName     String
-  type          JobType     @default(PROCESS_COI)
-  status        JobStatus   @default(QUEUED)
-  attempts      Int         @default(0)
-  failureReason String?
-  dlqJobId      String?
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-
-  @@index([status])
-  @@index([coiDocumentId])
-  @@index([createdAt])
-}
-
-model ProcessedWebhookEvent {
-  messageId String   @id
-  createdAt DateTime @default(now())
-}
-
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum CoiStatus {
+  PENDING_REVIEW
+  ACCEPTED
+  REJECTED
+  EXPIRING_SOON
+  EXPIRED
+}
+
+enum IntakeSource {
+  DASHBOARD
+  EMAIL
+}
+
+enum JobStatus {
+  QUEUED
+  PROCESSING
+  READY_FOR_REVIEW
+  FAILED
+  DLQ
+}
+
+enum JobType {
+  PROCESS_COI
+  SEND_TEMPLATE_EMAIL
+  SEND_REMINDER
+}
+
+model Sender {
+  id          String       @id @default(cuid())
+  email       String       @unique
+  displayName String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  versions    CoiVersion[]
+
+  @@index([email])
+}
+
+model CoiDocument {
+  id                 String       @id @default(cuid())
+  fileName           String
+  cloudinaryUrl      String
+  cloudinaryPublicId String
+  mimeType           String
+  fileSizeBytes      Int
+  intakeSource       IntakeSource @default(DASHBOARD)
+  senderEmail        String?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  version            CoiVersion?
+  jobs               CoiJob[]
+
+  @@index([createdAt])
+  @@index([senderEmail])
+}
+
+model CoiVersion {
+  id              String      @id @default(cuid())
+  senderId        String
+  sender          Sender      @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  versionNumber   Int
+  coiDocumentId   String      @unique
+  coiDocument     CoiDocument @relation(fields: [coiDocumentId], references: [id], onDelete: Cascade)
+  status          CoiStatus   @default(PENDING_REVIEW)
+  rejectionReason String?
+  notes           String?
+  jobs            CoiJob[]
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@unique([senderId, versionNumber])
+  @@index([senderId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model CoiJob {
+  id            String      @id @default(cuid())
+  coiVersionId  String?
+  coiVersion    CoiVersion? @relation(fields: [coiVersionId], references: [id], onDelete: Cascade)
+  coiDocumentId String
+  coiDocument   CoiDocument @relation(fields: [coiDocumentId], references: [id], onDelete: Cascade)
+  bullmqJobId   String?
+  queueName     String
+  type          JobType     @default(PROCESS_COI)
+  status        JobStatus   @default(QUEUED)
+  attempts      Int         @default(0)
+  failureReason String?
+  dlqJobId      String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([status])
+  @@index([coiVersionId])
+  @@index([coiDocumentId])
+  @@index([createdAt])
+}
+
+model ChecklistItem {
+  id            String   @id @default(cuid())
+  requirement   String
+  expectedValue String
+  mandatory     Boolean  @default(true)
+  category      String
+  enabled       Boolean  @default(true)
+  sortOrder     Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([category])
+  @@index([enabled, sortOrder])
+}
+
+model ProcessedWebhookEvent {
+  messageId String   @id
+  createdAt DateTime @default(now())
+}

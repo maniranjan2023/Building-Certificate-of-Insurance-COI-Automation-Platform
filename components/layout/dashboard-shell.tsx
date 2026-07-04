@@ -46,7 +46,7 @@ export function DashboardShell({ children, userEmail }: DashboardShellProps) {
               <h1 className="text-lg font-semibold tracking-tight">{pageTitle}</h1>
             </div>
             <div className="hidden rounded border bg-muted/40 px-2 py-0.5 text-[11px] font-medium text-muted-foreground sm:block">
-              Phase 2
+              Phase 3
             </div>
           </div>
         </header>

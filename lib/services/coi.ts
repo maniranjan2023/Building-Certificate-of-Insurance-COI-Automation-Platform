@@ -1,14 +1,21 @@
 import {
-  CoiStatus,
   IntakeSource,
   type CoiDocument,
   type CoiJob,
+  type CoiVersion,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { uploadCoiBuffer, uploadCoiDocument } from "@/lib/services/cloudinary";
 import { createProcessCoiJob } from "@/lib/services/jobs";
+import { findOrCreateSender } from "@/lib/services/sender";
+import {
+  createCoiVersionForDocument,
+  getVersionByDocumentId,
+  listAllVersionsWithLatestJob,
+  type CoiVersionWithRelations,
+} from "@/lib/services/version";
 
-export type CoiDocumentWithLatestJob = CoiDocument & {
+export type CoiSubmissionRow = CoiVersionWithRelations & {
   latestJob: CoiJob | null;
 };
 
@@ -19,7 +26,7 @@ const ALLOWED_MIME_TYPES = new Set([
   "image/webp",
 ]);
 
-const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 
 export class CoiValidationError extends Error {
   constructor(message: string) {
@@ -44,10 +51,7 @@ export function validateCoiFile(file: File): void {
   }
 }
 
-export function validateCoiBuffer(
-  buffer: Buffer,
-  mimeType: string
-): void {
+export function validateCoiBuffer(buffer: Buffer, mimeType: string): void {
   if (!ALLOWED_MIME_TYPES.has(mimeType)) {
     throw new CoiValidationError(
       "Invalid file type. Upload a PDF or image (JPEG, PNG, WebP)."
@@ -61,6 +65,16 @@ export function validateCoiBuffer(
   if (buffer.byteLength === 0) {
     throw new CoiValidationError("File is empty.");
   }
+}
+
+function validateSenderEmail(email: string | null | undefined): string {
+  const trimmed = email?.trim().toLowerCase();
+  if (!trimmed || !trimmed.includes("@")) {
+    throw new CoiValidationError(
+      "Tenant email is required for version tracking (e.g. tenant@example.com)."
+    );
+  }
+  return trimmed;
 }
 
 interface CreateCoiInput {
@@ -81,30 +95,39 @@ async function createCoiRecord(
       cloudinaryPublicId: upload.publicId,
       mimeType: input.mimeType,
       fileSizeBytes: upload.bytes,
-      status: CoiStatus.PENDING_REVIEW,
       intakeSource: input.intakeSource,
       senderEmail: input.senderEmail ?? null,
     },
   });
 }
 
-export async function createCoiFromUpload(file: File): Promise<CoiDocument> {
+async function createSubmissionWithJob(
+  document: CoiDocument,
+  senderEmail: string
+): Promise<{ document: CoiDocument; version: CoiVersion; job: CoiJob }> {
+  const version = await createCoiVersionForDocument(document.id, senderEmail);
+  const job = await createProcessCoiJob(version.id, document.id);
+  return { document, version, job };
+}
+
+export async function createCoiFromUploadWithJob(
+  file: File,
+  senderEmail?: string | null
+) {
   validateCoiFile(file);
+  const email = validateSenderEmail(senderEmail);
   const upload = await uploadCoiDocument(file);
-  return createCoiRecord(
+  const document = await createCoiRecord(
     {
       fileName: file.name,
       mimeType: file.type,
       intakeSource: IntakeSource.DASHBOARD,
+      senderEmail: email,
     },
     upload
   );
-}
 
-export async function createCoiFromUploadWithJob(file: File) {
-  const document = await createCoiFromUpload(file);
-  const job = await createProcessCoiJob(document.id);
-  return { document, job };
+  return createSubmissionWithJob(document, email);
 }
 
 export async function createCoiFromBufferWithJob(
@@ -120,12 +143,27 @@ export async function createCoiFromBufferWithJob(
       fileName,
       mimeType,
       intakeSource: IntakeSource.EMAIL,
-      senderEmail,
+      senderEmail: email,
     },
     upload
   );
-  const job = await createProcessCoiJob(document.id);
-  return { document, job };
+
+  const email = senderEmail?.trim().toLowerCase();
+  if (!email || !email.includes("@")) {
+    throw new CoiValidationError(
+      "Email intake requires a valid sender email on the message."
+    );
+  }
+
+  await findOrCreateSender(email);
+  return createSubmissionWithJob(document, email);
+}
+
+export async function createResubmissionWithJob(
+  file: File,
+  senderEmail: string
+) {
+  return createCoiFromUploadWithJob(file, senderEmail);
 }
 
 export async function listCoiDocuments(): Promise<CoiDocument[]> {
@@ -134,23 +172,17 @@ export async function listCoiDocuments(): Promise<CoiDocument[]> {
   });
 }
 
-export async function listCoiDocumentsWithLatestJob(): Promise<
-  CoiDocumentWithLatestJob[]
-> {
-  const documents = await prisma.coiDocument.findMany({
-    orderBy: { createdAt: "desc" },
-    include: {
-      jobs: {
-        orderBy: { createdAt: "desc" },
-        take: 1,
-      },
-    },
-  });
-
-  return documents.map(({ jobs, ...document }) => ({
-    ...document,
-    latestJob: jobs[0] ?? null,
+export async function listCoiSubmissions(): Promise<CoiSubmissionRow[]> {
+  const versions = await listAllVersionsWithLatestJob();
+  return versions.map((version) => ({
+    ...version,
+    latestJob: version.jobs[0] ?? null,
   }));
+}
+
+/** @deprecated Use listCoiSubmissions — kept for compatibility */
+export async function listCoiDocumentsWithLatestJob(): Promise<CoiSubmissionRow[]> {
+  return listCoiSubmissions();
 }
 
 export async function getCoiDocumentById(
@@ -159,31 +191,31 @@ export async function getCoiDocumentById(
   return prisma.coiDocument.findUnique({ where: { id } });
 }
 
-export async function getCoiDocumentByIdWithLatestJob(
-  id: string
-): Promise<CoiDocumentWithLatestJob | null> {
-  const document = await prisma.coiDocument.findUnique({
-    where: { id },
-    include: {
-      jobs: {
-        orderBy: { createdAt: "desc" },
-        take: 1,
-      },
-    },
-  });
-
-  if (!document) {
-    return null;
+export async function getCoiDocumentByIdWithLatestJob(id: string) {
+  const version = await getVersionByDocumentId(id);
+  if (!version) {
+    const document = await getCoiDocumentById(id);
+    if (!document) {
+      return null;
+    }
+    return {
+      ...document,
+      version: null,
+      sender: null,
+      latestJob: null as CoiJob | null,
+      status: null,
+      senderEmail: null,
+    };
   }
 
-  const { jobs, ...rest } = document;
-  return { ...rest, latestJob: jobs[0] ?? null };
+  return {
+    ...version.coiDocument,
+    version,
+    sender: version.sender,
+    latestJob: version.jobs[0] ?? null,
+    status: version.status,
+    senderEmail: version.sender.email,
+  };
 }
 
-export const COI_STATUS_LABELS: Record<CoiStatus, string> = {
-  PENDING_REVIEW: "Pending Review",
-  ACCEPTED: "Accepted",
-  REJECTED: "Rejected",
-  EXPIRING_SOON: "Expiring Soon",
-  EXPIRED: "Expired",
-};
+export { COI_STATUS_LABELS } from "@/lib/services/version-labels";

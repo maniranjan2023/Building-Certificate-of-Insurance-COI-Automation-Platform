@@ -14,21 +14,26 @@ async function main() {
   console.log("DLQ:", env.BULLMQ_COI_DLQ);
   console.log("Ensure npm run worker is running in another terminal.\n");
 
-  const doc = await prisma.coiDocument.findFirst({ orderBy: { createdAt: "desc" } });
-  if (!doc) {
+  const version = await prisma.coiVersion.findFirst({
+    orderBy: { createdAt: "desc" },
+    include: { coiDocument: true },
+  });
+
+  if (!version) {
     console.error("Upload a COI first, then run this script.");
     process.exit(1);
   }
 
   const job = await prisma.coiJob.create({
     data: {
-      coiDocumentId: doc.id,
+      coiVersionId: version.id,
+      coiDocumentId: version.coiDocumentId,
       queueName: env.BULLMQ_COI_QUEUE,
       status: "QUEUED",
     },
   });
 
-  await enqueueProcessCoiJob(job.id, doc.id);
+  await enqueueProcessCoiJob(job.id, version.coiDocumentId, version.id);
   console.log(`Enqueued test job ${job.id} (forceFail=true)\n`);
 
   for (let i = 0; i < 20; i++) {
