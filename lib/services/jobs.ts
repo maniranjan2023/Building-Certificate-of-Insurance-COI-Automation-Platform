@@ -5,16 +5,21 @@ import { getEnv } from "@/lib/env";
 
 export { JOB_STATUS_LABELS } from "@/lib/constants/job-status";
 
-export type CoiJobWithDocument = Prisma.CoiJobGetPayload<{
-  include: { coiDocument: true };
+export type CoiJobWithRelations = Prisma.CoiJobGetPayload<{
+  include: {
+    coiDocument: true;
+    coiVersion: { include: { sender: true } } | true;
+  };
 }>;
 
 export async function createProcessCoiJob(
+  coiVersionId: string,
   coiDocumentId: string
 ): Promise<CoiJob> {
   const env = getEnv();
   const job = await prisma.coiJob.create({
     data: {
+      coiVersionId,
       coiDocumentId,
       queueName: env.BULLMQ_COI_QUEUE,
       type: JobType.PROCESS_COI,
@@ -22,7 +27,11 @@ export async function createProcessCoiJob(
     },
   });
 
-  const bullmqJobId = await enqueueProcessCoiJob(job.id, coiDocumentId);
+  const bullmqJobId = await enqueueProcessCoiJob(
+    job.id,
+    coiDocumentId,
+    coiVersionId
+  );
 
   return prisma.coiJob.update({
     where: { id: job.id },
@@ -30,17 +39,23 @@ export async function createProcessCoiJob(
   });
 }
 
-export async function listCoiJobs(): Promise<CoiJobWithDocument[]> {
+export async function listCoiJobs(): Promise<CoiJobWithRelations[]> {
   return prisma.coiJob.findMany({
-    include: { coiDocument: true },
+    include: {
+      coiDocument: true,
+      coiVersion: { include: { sender: true } },
+    },
     orderBy: { createdAt: "desc" },
   });
 }
 
-export async function listDlqJobs(): Promise<CoiJobWithDocument[]> {
+export async function listDlqJobs(): Promise<CoiJobWithRelations[]> {
   return prisma.coiJob.findMany({
     where: { status: JobStatus.DLQ },
-    include: { coiDocument: true },
+    include: {
+      coiDocument: true,
+      coiVersion: { include: { sender: true } },
+    },
     orderBy: { updatedAt: "desc" },
   });
 }
@@ -51,7 +66,10 @@ export async function getCoiJobById(id: string): Promise<CoiJob | null> {
 
 export async function updateCoiJobStatus(
   id: string,
-  data: Pick<Prisma.CoiJobUpdateInput, "status" | "attempts" | "failureReason" | "dlqJobId" | "bullmqJobId">
+  data: Pick<
+    Prisma.CoiJobUpdateInput,
+    "status" | "attempts" | "failureReason" | "dlqJobId" | "bullmqJobId"
+  >
 ): Promise<CoiJob> {
   return prisma.coiJob.update({
     where: { id },
@@ -76,6 +94,7 @@ export async function retryJobFromDlq(coiJobId: string): Promise<CoiJob> {
   const enqueuedId = await enqueueProcessCoiJob(
     existing.id,
     existing.coiDocumentId,
+    existing.coiVersionId,
     { forceFail: false, bullmqJobId }
   );
 

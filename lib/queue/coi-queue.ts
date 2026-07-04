@@ -8,6 +8,7 @@ export const PROCESS_COI_JOB_NAME = "process-coi";
 export interface ProcessCoiJobData {
   coiJobId: string;
   coiDocumentId: string;
+  coiVersionId: string;
   /** Set at enqueue when WORKER_FORCE_FAIL=true — survives worker restarts/retries */
   forceFail?: boolean;
 }
@@ -39,6 +40,7 @@ export function getCoiDlqQueue(): Queue<ProcessCoiJobData> {
 export async function enqueueProcessCoiJob(
   coiJobId: string,
   coiDocumentId: string,
+  coiVersionId: string,
   options?: { forceFail?: boolean; bullmqJobId?: string }
 ): Promise<string> {
   const forceFail = options?.forceFail ?? isDlqTestMode();
@@ -49,6 +51,7 @@ export async function enqueueProcessCoiJob(
     {
       coiJobId,
       coiDocumentId,
+      coiVersionId,
       ...(forceFail ? { forceFail: true } : {}),
     },
     getEnqueueJobOptions(bullmqJobId)

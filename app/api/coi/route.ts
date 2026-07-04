@@ -26,8 +26,16 @@ export async function POST(request: Request) {
       return jsonError("A COI file is required.");
     }
 
-    const { document, job } = await createCoiFromUploadWithJob(file);
-    return jsonOk({ document, job }, { status: 201 });
+    const senderEmail = formData.get("senderEmail");
+    if (typeof senderEmail !== "string" || !senderEmail.trim()) {
+      return jsonError("Tenant email is required for version tracking.");
+    }
+
+    const { document, version, job } = await createCoiFromUploadWithJob(
+      file,
+      senderEmail
+    );
+    return jsonOk({ document, version, job }, { status: 201 });
   } catch (error) {
     if (error instanceof CoiValidationError) {
       return jsonError(error.message, 400);
