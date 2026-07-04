@@ -3,7 +3,9 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import { getCoiDocumentByIdWithLatestJob, COI_STATUS_LABELS } from "@/lib/services/coi";
 import { JOB_STATUS_LABELS } from "@/lib/constants/job-status";
+import { INTAKE_SOURCE_DESCRIPTIONS } from "@/lib/constants/intake-source";
 import { formatBytes, formatDate } from "@/lib/utils";
+import { IntakeSourceBadge } from "@/components/ui/intake-source-badge";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { JobStatusBadge } from "@/components/ui/job-status-badge";
 import { Button } from "@/components/ui/button";
@@ -41,6 +43,7 @@ export default async function CoiDetailPage({ params }: CoiDetailPageProps) {
           </p>
         </div>
         <div className="flex flex-col items-end gap-2">
+          <IntakeSourceBadge source={document.intakeSource} />
           {document.latestJob ? (
             <JobStatusBadge
               status={document.latestJob.status}
@@ -61,6 +64,21 @@ export default async function CoiDetailPage({ params }: CoiDetailPageProps) {
             <CardDescription className="text-sm">Stored immutably in Cloudinary</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 px-4 pb-4 text-sm">
+            <div>
+              <p className="text-muted-foreground">Intake source</p>
+              <div className="mt-1">
+                <IntakeSourceBadge source={document.intakeSource} />
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {INTAKE_SOURCE_DESCRIPTIONS[document.intakeSource]}
+              </p>
+            </div>
+            {document.senderEmail ? (
+              <div>
+                <p className="text-muted-foreground">Sender email</p>
+                <p className="font-medium">{document.senderEmail}</p>
+              </div>
+            ) : null}
             <div>
               <p className="text-muted-foreground">File name</p>
               <p className="font-medium">{document.fileName}</p>

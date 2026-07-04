@@ -122,7 +122,7 @@ Do **not** use `/webhook` — that path was for the old `agent.py` prototype. Ph
 4. **Attach a PDF** (or JPEG, PNG, WebP) — plain text without attachment is ignored (`no_valid_attachment`)
 5. Watch the **`npm run dev` terminal** for `POST /api/webhooks/agentmail`
 6. Watch the **worker terminal** for `processing job ...`
-7. Open **`/dashboard`** and **refresh** — new row with source **email**, job status **Queued** → **Processing** → **Ready for Review**
+7. Open **`/dashboard`** and **refresh** — new row with **Email (AgentMail)** badge, job status **Queued** → **Processing** → **Ready for Review**
 
 ### What you should see
 
@@ -130,8 +130,32 @@ Do **not** use `/webhook` — that path was for the old `agent.py` prototype. Ph
 |----------|----------|
 | Dev server logs | Webhook POST to `/api/webhooks/agentmail` |
 | Worker logs | Job picked up and completed |
-| Dashboard | COI from source `EMAIL`, sender email populated |
-| Job Queue (`/dashboard/jobs`) | Matching job with status updates |
+| Dashboard | **Email (AgentMail)** source badge; sender email on detail page |
+| Job Queue (`/dashboard/jobs`) | Same source badge + job status updates |
+
+---
+
+## Intake source tags
+
+Each COI is tagged by how it entered the system (`CoiDocument.intakeSource` in Neon):
+
+| UI badge | DB value | How it arrives |
+|----------|----------|----------------|
+| **Dashboard Upload** (blue) | `DASHBOARD` | Admin uploads via `/dashboard` → `POST /api/coi` |
+| **Email (AgentMail)** (teal) | `EMAIL` | Tenant emails PDF to inbox → AgentMail webhook |
+
+### Where badges appear
+
+- **COI Dashboard** (`/dashboard`) — **Source** column
+- **COI detail** (`/dashboard/[id]`) — header badge + document details; **sender email** shown for email intake
+- **Job Queue** (`/dashboard/jobs`) — **Source** column per job
+
+### Key files
+
+- `prisma/schema.prisma` — `IntakeSource` enum on `CoiDocument`
+- `lib/constants/intake-source.ts` — labels and descriptions
+- `components/ui/intake-source-badge.tsx` — badge component
+- `components/coi/coi-table.tsx`, `components/jobs/jobs-table.tsx`, `app/dashboard/[id]/page.tsx`
 
 ---
 
@@ -139,8 +163,8 @@ Do **not** use `/webhook` — that path was for the old `agent.py` prototype. Ph
 
 | Step | Action | Expected result |
 |------|--------|-----------------|
-| 1 | Upload COI on dashboard | Job appears with status **Queued** → **Processing** → **Ready for Review** |
-| 2 | Email PDF to `maniranjan@agentmail.to` | Webhook creates COI + job; visible on dashboard after refresh |
+| 1 | Upload COI on dashboard | Job appears with status **Queued** → **Processing** → **Ready for Review**; badge **Dashboard Upload** |
+| 2 | Email PDF to `maniranjan@agentmail.to` | Webhook creates COI + job; badge **Email (AgentMail)** on dashboard after refresh |
 | 3 | Check Redis | Jobs present on `coi-jobs` queue during processing |
 | 4 | Force worker error (test mode) | Retries with exponential backoff in logs |
 | 5 | After max attempts | Job in `coi-jobs-dlq`; dashboard shows **DLQ** status |
@@ -174,6 +198,7 @@ Do **not** use `/webhook` — that path was for the old `agent.py` prototype. Ph
 - AgentMail webhook → Neon + Cloudinary + enqueue `coi-jobs`
 - Dashboard upload enqueues same job type
 - `CoiJob` model + job status UI
+- **Intake source tags** — Dashboard Upload vs Email (AgentMail) badges on dashboard, detail, and job queue
 - Exponential backoff retries
 - DLQ routing + inspection UI + manual retry
 - Stub worker (no full AI — that's Phase 4)

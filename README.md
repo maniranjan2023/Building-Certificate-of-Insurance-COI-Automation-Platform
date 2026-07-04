@@ -922,16 +922,18 @@ Each phase delivers a working increment. 2–3 features per phase, ordered by de
 | 4 | Exponential backoff | Shared retry config on all `coi-jobs` enqueues (5 attempts, 5s base) |
 | 5 | Dead Letter Queue | Failed jobs → `coi-jobs-dlq`; dashboard DLQ view + optional manual retry |
 | 6 | Stub worker | Worker simulates Processing → Ready (full AI in Phase 4) |
+| 7 | Intake source tags | Dashboard badges show **Dashboard Upload** vs **Email (AgentMail)** per COI |
 
-**Problem solved:** Tenants can email COIs directly. Both intake channels feed one reliable processing queue with production-grade failure handling.
+**Problem solved:** Tenants can email COIs directly. Both intake channels feed one reliable processing queue with production-grade failure handling. Admins can see at a glance where each COI came from.
 
 **Exit criteria:**
 - Email a COI to the inbox → COI record + job on dashboard → status updates
 - Dashboard upload enqueues `coi-jobs` (same path as webhook)
+- Each COI shows an intake source badge: **Dashboard Upload** or **Email (AgentMail)**
 - Force worker failure → see exponential retries in logs
 - After max attempts → job in `coi-jobs-dlq` + visible on dashboard
 
-**Key files:** `app/api/webhooks/agentmail/`, `lib/queue/`, `lib/workers/`, `scripts/worker.ts`, `docs/PHASE2.md`
+**Key files:** `app/api/webhooks/agentmail/`, `lib/queue/`, `lib/workers/`, `scripts/worker.ts`, `components/ui/intake-source-badge.tsx`, `docs/PHASE2.md`
 
 **AgentMail email intake (local dev):**
 
@@ -944,7 +946,16 @@ Dashboard upload works without ngrok. **Email intake** requires a public webhook
    ```
    Event: `message.received`
 3. Email a **PDF attachment** to `maniranjan@agentmail.to`
-4. Refresh `/dashboard` — COI appears with source **email**
+4. Refresh `/dashboard` — COI appears with **Email (AgentMail)** source badge
+
+**Intake source tags:** Every COI shows where it was received:
+
+| Badge | Meaning | Set when |
+|-------|---------|----------|
+| **Dashboard Upload** (blue) | Manual upload from admin UI | `POST /api/coi` |
+| **Email (AgentMail)** (teal) | Inbound email via webhook | `POST /api/webhooks/agentmail` |
+
+Visible on **COI Dashboard**, **COI detail** (with sender email for email intake), and **Job Queue**.
 
 | Config | Format |
 |--------|--------|
