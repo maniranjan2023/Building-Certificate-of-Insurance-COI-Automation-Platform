@@ -933,7 +933,25 @@ Each phase delivers a working increment. 2–3 features per phase, ordered by de
 
 **Key files:** `app/api/webhooks/agentmail/`, `lib/queue/`, `lib/workers/`, `scripts/worker.ts`, `docs/PHASE2.md`
 
-**Note:** Builds on existing `agent.py` AgentMail webhook pattern — migrated to Next.js API routes + `agentmail` npm SDK.
+**AgentMail email intake (local dev):**
+
+Dashboard upload works without ngrok. **Email intake** requires a public webhook URL:
+
+1. Run `npm run dev`, `npm run worker`, and `ngrok http 3000`
+2. In the **AgentMail dashboard**, register:
+   ```
+   https://<your-ngrok-domain>/api/webhooks/agentmail
+   ```
+   Event: `message.received`
+3. Email a **PDF attachment** to `maniranjan@agentmail.to`
+4. Refresh `/dashboard` — COI appears with source **email**
+
+| Config | Format |
+|--------|--------|
+| `.env` `WEBHOOK_DOMAIN` | Domain only, no `https://` (optional) |
+| AgentMail webhook URL | Full `https://` URL + `/api/webhooks/agentmail` |
+
+Full setup, test steps, and troubleshooting: **[docs/PHASE2.md](docs/PHASE2.md)**
 
 ---
 
@@ -1103,19 +1121,17 @@ npm run worker
 # 4. node-cron — enqueues reminder-jobs only (separate terminal, Phase 6)
 npm run cron
 
-# 5. AgentMail webhook tunnel (separate terminal)
-ngrok http --url=your-domain.ngrok-free.dev 3000
+# 5. AgentMail webhook tunnel (separate terminal — email intake only)
+ngrok http 3000
+# Register in AgentMail dashboard:
+# https://<ngrok-domain>/api/webhooks/agentmail
 ```
 
-### Current Prototype
+See **[docs/PHASE2.md](docs/PHASE2.md)** for AgentMail webhook setup, email test flow, and troubleshooting.
 
-The `agent.py` file in this repo is a **Phase 2 prototype** that demonstrates:
+### Legacy prototype
 
-- AgentMail inbox setup and webhook registration
-- Email receive → attachment save → AI reply via Groq
-- ngrok tunnel for webhook delivery
-
-This will be migrated to Next.js API routes in Phase 2.
+The `agent.py` file is an older Flask prototype. Phase 2 email intake is implemented in Next.js at `app/api/webhooks/agentmail/` using the `agentmail` npm SDK.
 
 ---
 
