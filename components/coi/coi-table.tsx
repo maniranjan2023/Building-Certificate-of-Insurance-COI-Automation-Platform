@@ -1,15 +1,18 @@
 import Link from "next/link";
 import { ExternalLink } from "lucide-react";
-import type { CoiDocumentWithLatestJob } from "@/lib/services/coi";
+import type { CoiSubmissionRow } from "@/lib/services/coi";
 import { JOB_STATUS_LABELS } from "@/lib/constants/job-status";
+import { COI_STATUS_LABELS } from "@/lib/services/version-labels";
 import { formatBytes, formatDate } from "@/lib/utils";
 import { IntakeSourceBadge } from "@/components/ui/intake-source-badge";
 import { JobStatusBadge } from "@/components/ui/job-status-badge";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { VersionBadge } from "@/components/ui/version-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface CoiTableProps {
-  documents: CoiDocumentWithLatestJob[];
+  documents: CoiSubmissionRow[];
 }
 
 const compactCardClass = "gap-3 py-4";
@@ -36,32 +39,47 @@ export function CoiTable({ documents }: CoiTableProps) {
       <CardHeader className={compactHeaderClass}>
         <CardTitle className={compactTitleClass}>COI submissions</CardTitle>
         <CardDescription className="text-sm">
-          {documents.length} document{documents.length === 1 ? "" : "s"} in your portfolio
+          {documents.length} version{documents.length === 1 ? "" : "s"} in your portfolio
         </CardDescription>
       </CardHeader>
       <CardContent className={`${compactContentClass} overflow-x-auto`}>
-        <table className="w-full min-w-[820px] text-left text-sm">
+        <table className="w-full min-w-[960px] text-left text-sm">
           <thead>
             <tr className="border-b text-muted-foreground">
               <th className="px-2 py-2 font-medium">File</th>
+              <th className="px-2 py-2 font-medium">Tenant</th>
+              <th className="px-2 py-2 font-medium">Version</th>
               <th className="px-2 py-2 font-medium">Source</th>
+              <th className="px-2 py-2 font-medium">COI status</th>
               <th className="px-2 py-2 font-medium">Job status</th>
-              <th className="px-2 py-2 font-medium">Size</th>
               <th className="px-2 py-2 font-medium">Uploaded</th>
               <th className="px-2 py-2 font-medium">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {documents.map((document) => {
-              const job = document.latestJob;
+            {documents.map((submission) => {
+              const document = submission.coiDocument;
+              const job = submission.latestJob;
 
               return (
-                <tr key={document.id} className="border-b last:border-0">
+                <tr key={submission.id} className="border-b last:border-0">
                   <td className="px-2 py-2.5 font-medium">
                     {document.fileName}
                   </td>
+                  <td className="px-2 py-2.5 text-muted-foreground">
+                    {submission.sender.email}
+                  </td>
+                  <td className="px-2 py-2.5">
+                    <VersionBadge versionNumber={submission.versionNumber} />
+                  </td>
                   <td className="px-2 py-2.5">
                     <IntakeSourceBadge source={document.intakeSource} />
+                  </td>
+                  <td className="px-2 py-2.5">
+                    <StatusBadge
+                      status={submission.status}
+                      label={COI_STATUS_LABELS[submission.status]}
+                    />
                   </td>
                   <td className="px-2 py-2.5">
                     {job ? (
@@ -77,20 +95,6 @@ export function CoiTable({ documents }: CoiTableProps) {
                           >
                             View in dead letter queue →
                           </Link>
-                        ) : job.status === "FAILED" ? (
-                          <Link
-                            href="/dashboard/jobs"
-                            className="text-xs text-amber-400 hover:underline"
-                          >
-                            View in job queue →
-                          </Link>
-                        ) : job.status !== "READY_FOR_REVIEW" ? (
-                          <Link
-                            href="/dashboard/jobs"
-                            className="text-xs text-muted-foreground hover:underline"
-                          >
-                            View job queue →
-                          </Link>
                         ) : null}
                       </div>
                     ) : (
@@ -98,10 +102,7 @@ export function CoiTable({ documents }: CoiTableProps) {
                     )}
                   </td>
                   <td className="px-2 py-2.5 text-muted-foreground">
-                    {formatBytes(document.fileSizeBytes)}
-                  </td>
-                  <td className="px-2 py-2.5 text-muted-foreground">
-                    {formatDate(document.createdAt)}
+                    {formatDate(submission.createdAt)}
                   </td>
                   <td className="px-2 py-2.5">
                     <div className="flex items-center gap-1.5">
@@ -129,4 +130,3 @@ export function CoiTable({ documents }: CoiTableProps) {
     </Card>
   );
 }
-
