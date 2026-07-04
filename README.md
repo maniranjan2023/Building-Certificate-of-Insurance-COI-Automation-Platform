@@ -223,21 +223,25 @@ No compliance visibility          →       Live dashboard with metrics and audi
 
 Both paths create a database record, upload the file to **Cloudinary**, and enqueue a **BullMQ** job. Same processing. Same standards. No channel bias.
 
-### Processing (multi-agent AI)
+### Processing (multi-agent AI — Phase 4)
 
-A chain of specialized AI agents runs **sequentially** (Groq models via OpenAI SDK):
+**Pre-pipeline:** Validate COI PDF exists (before OCR). **LlamaParse** extracts text from PDF + email body.
 
-1. **Document Agent** — Is this a valid COI? OCR if scanned.
-2. **Extraction Agent** — Carrier, limits, dates, named insured, policy number, endorsements.
-3. **Checklist Agent** — Every requirement pass/fail against your editable checklist.
-4. **Risk & Gap Agent** — Missing mandatory clauses, low-confidence fields, compliance risks.
-5. **Report Agent** — Summary, accept/reject recommendation, citations, confidence score.
+A chain of five specialized agents runs **sequentially** (Groq models via **OpenAI SDK** + **OpenAI Agents SDK** guardrails). Each agent is a separate run with its own **input guardrail** (before) and **output guardrail** (after):
+
+1. **Document Agent** — Is this a valid COI? Early exit if not.
+2. **Extraction Agent** — Structured JSON: carrier, limits, dates, insured, policy #, endorsements.
+3. **Checklist Agent** — Compare against DB checklist; status per item: **PASS / FAIL / MISSING** (never UNKNOWN).
+4. **Risk & Gap Agent** — Mandatory failures, risk level, low-confidence fields (runs even when clauses are missing).
+5. **Report Agent** — Draft summary, citations, recommendation, suggested email text for admin review.
+
+**Reliability:** Zod JSON validation after every agent · Groq model **fallback chain** on 429/503/unavailable only · **Logfire** tracing per job.
 
 ### Human-in-the-loop
 
 AI **recommends**. Admin **decides**.
 
-Accept or reject with a reason. Rejection triggers a detailed, templated email listing exactly what's wrong.
+Agent 5 produces an **editable draft report** (Phase 5 UI). Admin reviews, edits if needed, then sends email via AgentMail. Accept or reject with a reason. Tenant receives a **template-based email** (not the raw internal agent dump).
 
 ### Versioning
 
@@ -347,25 +351,28 @@ BullMQ is the **async worker layer** backed by **Redis**. See [Queue & Reliabili
 - All emails linked to COI record and version on dashboard
 - Outbound replies sent via AgentMail API
 
-### 8. Multi-Agent AI Review
+### 8. Multi-Agent AI Review (Phase 4)
 
-- Sequential specialist agents (not one monolithic prompt)
-- Document classification and OCR for scanned PDFs
+- Sequential specialist agents with **input/output guardrails** on every step
+- **LlamaParse** OCR for PDF + email body (not Groq OCR)
+- Document classification — early exit if not a COI
 - Structured field extraction (carrier, limits, dates, policy #, named insured)
-- Checklist comparison with per-item pass/fail
-- Risk detection and missing clause identification
-- Confidence scoring per finding
-- AI summary with source citations
-- Accept/reject recommendation for admin
+- Checklist comparison with per-item **PASS / FAIL / MISSING**
+- Risk detection and mandatory failure analysis (Agents 4 & 5 run even when clauses are missing)
+- Zod JSON validation + Groq model fallback on rate limits
+- **Logfire** tracing per job; `AiRun` + `AgentStep` stored in Neon
+- Draft report with citations and suggested email text for admin (Phase 5 edit + send)
 
-### 9. Admin Review & Decision
+### 9. Admin Review & Decision (Phase 5)
 
 - Review full AI output per COI version
+- **Edit** Agent 5 draft report (summary, missing items, citations) before sending
 - **Accept** or **Reject** with mandatory rejection reason
+- **Send email** — output guardrail on final text → template → AgentMail
 - Decision applies to that specific version
 - If rejected, sender can submit a new version (creates next version number)
 - All decisions logged permanently in audit trail
-- Triggers appropriate email template automatically
+- Hybrid email: auto for missing attachment / unreadable file; admin approval for AI outcomes
 
 ### 10. Editable Email Templates
 
@@ -447,36 +454,43 @@ Admin-editable templates with defined placeholders for every scenario. Preview w
 
 ```
 ┌─────────────────┐
-│  COI Document   │  (PDF upload or email attachment)
+│  Intake check   │  COI PDF attached? (webhook / worker pre-check)
 └────────┬────────┘
+         │ no PDF → auto email: Missing Attachment (no agents)
          ▼
 ┌─────────────────┐
-│  Agent 1        │  Document classification + OCR
-│  Document/OCR   │  → Is it a COI? Extract raw text.
+│  LlamaParse     │  OCR/text from PDF + email body
 └────────┬────────┘
+         │ unreadable → auto email: Processing Error (no agents)
          ▼
 ┌─────────────────┐
-│  Agent 2        │  Structured field extraction
+│  Agent 1        │  Document classification
+│  + guardrails   │  → Is it a COI?
+└────────┬────────┘
+         │ not COI → draft for admin → Send email (Phase 5)
+         ▼
+┌─────────────────┐
+│  Agent 2        │  Structured field extraction + guardrails
 │  Extraction     │  → Carrier, limits, dates, insured, policy #
 └────────┬────────┘
          ▼
 ┌─────────────────┐
-│  Agent 3        │  Checklist comparison
-│  Checklist      │  → Pass/fail per requirement, missing clauses
+│  Agent 3        │  Checklist comparison + guardrails
+│  Checklist      │  → PASS / FAIL / MISSING per DB checklist item
 └────────┬────────┘
          ▼
 ┌─────────────────┐
-│  Agent 4        │  Risk & gap analysis
-│  Risk & Gaps    │  → Mandatory failures, confidence flags
+│  Agent 4        │  Risk & gap analysis + guardrails
+│  Risk & Gaps    │  → Mandatory failures, risk level, confidence
 └────────┬────────┘
          ▼
 ┌─────────────────┐
-│  Agent 5        │  Final report
-│  Report         │  → Summary, recommendation, citations
+│  Agent 5        │  Draft report + guardrails
+│  Report         │  → Summary, citations, suggested email text
 └────────┬────────┘
          ▼
 ┌─────────────────┐
-│  Admin Review   │  Accept / Reject → Email → Dashboard
+│  Admin Review   │  Edit draft → Send / Accept / Reject (Phase 5)
 └─────────────────┘
 ```
 
@@ -484,15 +498,41 @@ Admin-editable templates with defined placeholders for every scenario. Preview w
 
 | Agent | Input | Output | Early Exit |
 |-------|-------|--------|------------|
-| **Document/OCR** | Raw PDF/file | Clean text, document type, OCR if scanned | Stops chain if not a COI |
+| **Pre-check** | Webhook / upload | PDF present or not | No PDF → no agents, auto Missing Attachment email |
+| **LlamaParse** | Cloudinary PDF + email body | Markdown/text bundle | Unreadable → auto Processing Error email |
+| **Document** | OCR text | `isCoi`, clean text, document type | Not COI → skip agents 2–5, admin sends email |
 | **Extraction** | Clean text | Structured JSON: carrier, limits, dates, policy #, insured | — |
-| **Checklist** | Extracted fields + checklist rules | Per-item pass/fail, missing clauses list | — |
-| **Risk & Gaps** | Checklist results + extracted fields | Risk flags, mandatory failures, confidence scores | — |
-| **Report** | All prior agent outputs | Summary, recommendation, citations, overall confidence | — |
+| **Checklist** | Extraction + DB checklist | Per-item **PASS / FAIL / MISSING** | — |
+| **Risk & Gaps** | Checklist + extraction | Risk flags, mandatory failures, confidence | Always runs if Agent 3 ran |
+| **Report** | All prior outputs | Draft summary, citations, recommendation, suggested template | Always runs if Agent 3 ran |
 
-Each agent's output is stored independently in the database — full transparency, full auditability.
+Each agent's input/output and guardrail results are stored in **`AiRun`** + **`AgentStep`** — full transparency and auditability.
 
-**AI Provider:** Groq LLM models accessed via OpenAI SDK (compatible API).
+### Guardrails (OpenAI Agents SDK)
+
+Per [OpenAI guardrails guide](https://developers.openai.com/api/docs/guides/agents/guardrails-approvals): **input guardrails** before each agent (`runInParallel: false`), **output guardrails** before passing to the next agent. Tripwire → stop pipeline, log reason in Logfire, admin sends safe email (Phase 5).
+
+| Agent | Input guardrail | Output guardrail |
+|-------|-----------------|------------------|
+| 1 Document | Injection, jailbreak, harmful content in OCR text | Valid classification JSON |
+| 2 Extraction | Safe prior output | Zod-valid extraction JSON |
+| 3 Checklist | Grounding: extraction + DB checklist only | All items evaluated; no UNKNOWN |
+| 4 Risk | Complete checklist + extraction inputs | No hallucinated risk flags |
+| 5 Report | All prior outputs present | Report matches checklist; no invented missing clauses |
+
+### Hybrid email rules (Phase 4 auto · Phase 5 admin)
+
+| Scenario | Agents | Email timing |
+|----------|--------|--------------|
+| No COI PDF | None | **Auto** → Missing Attachment |
+| Unreadable file | None | **Auto** → Processing Error |
+| Valid PDF received | — | **Auto** → Receipt Acknowledged (optional) |
+| Not a COI | Agent 1 only | **Admin Send** after review |
+| Guardrail tripwire | Stops mid-pipeline | **Admin Send** (safe generic message) |
+| Checklist MISSING/FAIL | Full 1–5 | **Admin Send** after edit → Clauses / Items Missing |
+| All checklist PASS | Full 1–5 | **Admin Accept/Send** → All Matched / Approved |
+
+**AI stack:** Groq LLM via OpenAI SDK · **LlamaParse** for OCR · **Logfire** for observability · Groq-only model fallback (not task-based routing).
 
 ---
 
@@ -648,7 +688,7 @@ Before counting risk reduction from missed expiries
 | **File Storage** | Cloudinary | Immutable COI originals, secure URLs, PDF delivery |
 | **Job Queue** | BullMQ + Redis | Four queues: `coi-jobs`, `coi-jobs-dlq`, `reminder-jobs`, `reminder-jobs-dlq` |
 | **Scheduler** | node-cron (daily) | Scans expiry dates → enqueues to `reminder-jobs` only (never sends email directly) |
-| **AI** | OpenAI SDK → Groq LLM | Multi-agent sequential pipeline |
+| **AI** | OpenAI SDK + OpenAI Agents SDK → Groq LLM; LlamaParse OCR; Logfire tracing | Multi-agent pipeline with guardrails |
 | **Email** | AgentMail (`maniranjan@agentmail.to`) | Inbound COI intake + outbound templated replies |
 | **Auth** | JWT (via Next.js API routes) | Single admin session |
 
@@ -862,7 +902,7 @@ model CoiJob {
 
 **Phase 3** — `Sender`, `CoiVersion` (link `CoiJob` → version)
 
-**Phase 4** — `AiRun`, `AgentStep`, extracted fields JSON
+**Phase 4** — `AiRun`, `AgentStep`, extracted fields JSON, draft report + citations on `CoiVersion`
 
 **Phase 5** — `EmailTemplate`, `OutboundEmail`
 
@@ -984,17 +1024,34 @@ Full setup, test steps, and troubleshooting: **[docs/PHASE2.md](docs/PHASE2.md)*
 
 ### Phase 4 — Multi-Agent AI Pipeline
 
-**Complexity: High · Estimated: 2–3 weeks**
+**Complexity: High · Estimated: 2–3 weeks · Branch: `phase-4`**
 
 | # | Feature | Deliverable |
 |---|---------|-------------|
-| 1 | Document + OCR agent | Classify COI validity, OCR scanned PDFs via Groq |
-| 2 | Extraction + Checklist agents | Structured fields + per-requirement pass/fail against checklist |
-| 3 | Risk + Report agents | Gaps, summary, recommendation, citations displayed on dashboard |
+| 1 | **Pre-OCR intake checks** | No PDF → auto Missing Attachment email; unreadable file → auto Processing Error |
+| 2 | **LlamaParse OCR** | Extract text from COI PDF (Cloudinary) + email body |
+| 3 | **Five-agent pipeline** | Document → Extraction → Checklist → Risk → Report (Groq via OpenAI SDK) |
+| 4 | **Per-agent guardrails** | Input + output guardrails on every agent (OpenAI Agents SDK); tripwire stops pipeline |
+| 5 | **JSON validation** | Zod schemas for every agent output; retry + Groq fallback on failure |
+| 6 | **Checklist grounding** | PASS / FAIL / MISSING only (never UNKNOWN); DB checklist is source of truth |
+| 7 | **Groq model fallback** | Primary → fallback 1 → fallback 2 on 429/503/unavailable only (not task-based routing) |
+| 8 | **Logfire observability** | Full trace per COI job: OCR, guardrails, agents, validation, fallback events |
+| 9 | **Database persistence** | `AiRun`, `AgentStep`, extracted fields + draft report on `CoiVersion` |
+| 10 | **Worker integration** | Replace stub `process-coi` with real pipeline; status → Ready for Review / Failed |
+| 11 | **Dashboard AI results** | Extraction JSON, checklist table, risks, draft report, agent step timeline |
+| 12 | **Hybrid auto-email** | Auto-send: Missing Attachment, Processing Error, Receipt Acknowledged; admin-review cases store draft for Phase 5 |
 
-**Problem solved:** 20-minute manual review becomes a 2-minute admin confirmation. Every clause checked consistently against the same checklist.
+**Problem solved:** 20-minute manual review becomes a 2-minute admin confirmation. Every clause checked consistently against the same checklist, with guardrails, structured outputs, and full observability.
 
-**Exit criteria:** Upload COI → AI runs full 5-agent chain → dashboard shows extraction, checklist results, risks, and recommendation.
+**Exit criteria:**
+- Email with no attachment → auto Missing Attachment (no agents)
+- Upload valid COI → LlamaParse → 5 agents → 10 guardrails → dashboard shows full results
+- Missing clauses → Agents 4 & 5 still run → draft report with citations stored
+- Logfire shows one trace per job; Groq fallback visible on rate limit
+
+**Key files:** `lib/ai/`, `lib/workers/process-coi.ts`, `docs/PHASE4.md`
+
+**Not in Phase 4:** Admin report edit UI, Accept/Reject buttons, editable templates, final AgentMail send after admin edit (Phase 5).
 
 ---
 
@@ -1004,13 +1061,15 @@ Full setup, test steps, and troubleshooting: **[docs/PHASE2.md](docs/PHASE2.md)*
 
 | # | Feature | Deliverable |
 |---|---------|-------------|
-| 1 | Admin accept/reject | Decision with mandatory rejection reason per version |
-| 2 | Editable email templates | All 8 templates with placeholders, live preview in admin |
-| 3 | Auto-send via AgentMail | Correct template sent automatically per outcome |
+| 1 | **Editable draft report** | Admin edits Agent 5 summary, missing items, citations, tenant message before send |
+| 2 | **Admin accept/reject** | Decision with mandatory rejection reason per version |
+| 3 | **Editable email templates** | All 8 templates with placeholders, live preview in admin |
+| 4 | **Send via AgentMail** | Output guardrail on admin-final text → template render → send |
+| 5 | **Hybrid email completion** | Admin Send for: not-a-COI, guardrail fail, missing clauses, all-pass awaiting review |
 
-**Problem solved:** Tenants get clear, specific feedback instantly. No more vague "please fix your COI" emails.
+**Problem solved:** Tenants get clear, specific, citation-backed feedback. Admin controls final wording before any email leaves the system.
 
-**Exit criteria:** Admin rejects v1 → tenant receives detailed deficiency email → resubmits → receives acknowledgment → admin accepts → tenant receives approval email.
+**Exit criteria:** Admin edits draft → sends Clauses Missing email → tenant resubmits → admin accepts → Approved email with matched checklist summary.
 
 ---
 
@@ -1033,14 +1092,13 @@ Full setup, test steps, and troubleshooting: **[docs/PHASE2.md](docs/PHASE2.md)*
 ### Roadmap at a Glance
 
 ```
-Phase 1          Phase 2          Phase 3          Phase 4          Phase 5          Phase 6
-────────         ────────         ────────         ────────         ────────         ────────
-Admin Login      AgentMail        Editable         Document/OCR     Accept/Reject    node-cron →
-Neon +           Webhook          Checklist        Agent            + Email          reminder-jobs
-Cloudinary       coi-jobs + DLQ   COI Versioning   Extract +        Templates        Metrics
-Basic Dashboard  Job Status UI    Job Linking      Checklist Agents Auto-send        Audit Log
-                                                     Risk + Report
-                                                     Agents
+Phase 1          Phase 2          Phase 3          Phase 4                    Phase 5              Phase 6
+────────         ────────         ────────         ────────                   ────────             ────────
+Admin Login      AgentMail        Editable         LlamaParse OCR             Edit draft report    node-cron →
+Neon +           Webhook          Checklist        5 agents + guardrails      Accept/Reject        reminder-jobs
+Cloudinary       coi-jobs + DLQ   COI Versioning   Zod + Groq fallback        Email templates      Metrics
+Basic Dashboard  Job Status UI    Job Linking      Logfire + AiRun/AgentStep  AgentMail send       Audit Log
+                                                     Hybrid auto-email
 ```
 
 **Total estimated timeline: 8–12 weeks** for a production-ready v1.
@@ -1071,6 +1129,8 @@ Basic Dashboard  Job Status UI    Job Linking      Checklist Agents Auto-send   
 - Cloudinary account ([cloudinary.com](https://cloudinary.com))
 - Redis instance (local or cloud — for BullMQ)
 - Groq API key ([console.groq.com](https://console.groq.com))
+- LlamaCloud / LlamaParse API key ([cloud.llamaindex.ai](https://cloud.llamaindex.ai)) — Phase 4
+- Logfire account ([logfire.pydantic.dev](https://logfire.pydantic.dev)) — Phase 4
 - AgentMail account with inbox `maniranjan@agentmail.to`
 
 ### Environment Variables
@@ -1096,10 +1156,25 @@ JOB_BACKOFF_DELAY_MS=5000
 # Scheduler (Phase 6)
 CRON_SCHEDULE=0 9 * * *
 
-# AI (Groq via OpenAI SDK)
+# AI — Groq via OpenAI SDK (Phase 4+)
 GROQ_API_KEY=gsk_xxx
 GROQ_BASE_URL=https://api.groq.com/openai/v1
-GROQ_MODEL=llama-3.3-70b-versatile
+GROQ_MODEL_PRIMARY=llama-3.3-70b-versatile
+GROQ_MODEL_FALLBACK_1=llama-3.1-8b-instant
+GROQ_MODEL_FALLBACK_2=mixtral-8x7b-32768
+GROQ_GUARDRAIL_MODEL=llama-3.1-8b-instant
+AI_MAX_RETRIES=2
+AI_REQUEST_TIMEOUT_MS=60000
+
+# OCR — LlamaParse (Phase 4+)
+LLAMA_CLOUD_API_KEY=llx-xxx
+LLAMAPARSE_TIER=agentic
+
+# Observability — Logfire (Phase 4+)
+LOGFIRE_TOKEN=your_write_token
+LOGFIRE_SERVICE_NAME=coi-email-agent
+LOGFIRE_ENVIRONMENT=development
+LOGFIRE_SEND_TO_LOGFIRE=if-token-present
 
 # AgentMail
 AGENTMAIL_API_KEY=your_agentmail_key
@@ -1133,12 +1208,13 @@ npm run worker
 npm run cron
 
 # 5. AgentMail webhook tunnel (separate terminal — email intake only)
-ngrok http 3000
-# Register in AgentMail dashboard:
-# https://<ngrok-domain>/api/webhooks/agentmail
+# Use a reserved static domain so the URL never changes:
+ngrok http 3000 --domain=your-subdomain.ngrok-free.app
+# Register once in AgentMail dashboard:
+# https://your-subdomain.ngrok-free.app/api/webhooks/agentmail
 ```
 
-See **[docs/PHASE2.md](docs/PHASE2.md)** for AgentMail webhook setup, email test flow, and troubleshooting.
+See **[docs/PHASE2.md](docs/PHASE2.md)** for AgentMail webhook setup, static ngrok domain, email test flow, and troubleshooting. Phase 4 setup: **[docs/PHASE4.md](docs/PHASE4.md)** (when available).
 
 ### Legacy prototype
 
