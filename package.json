@@ -11,6 +11,7 @@
     "test:watch": "vitest",
     "postinstall": "prisma generate",
     "db:push": "prisma db push",
+    "db:phase3": "tsx --env-file=.env scripts/phase3-setup.ts",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "worker": "tsx --env-file=.env scripts/worker.ts",
