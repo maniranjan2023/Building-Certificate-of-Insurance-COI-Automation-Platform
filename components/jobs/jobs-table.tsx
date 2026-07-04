@@ -6,6 +6,7 @@ import { RotateCcw } from "lucide-react";
 import type { CoiJob, CoiDocument } from "@prisma/client";
 import { JOB_STATUS_LABELS } from "@/lib/constants/job-status";
 import { formatDate } from "@/lib/utils";
+import { IntakeSourceBadge } from "@/components/ui/intake-source-badge";
 import { JobStatusBadge } from "@/components/ui/job-status-badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -81,8 +82,8 @@ export function JobsTable({ jobs, dlqJobs }: JobsTableProps) {
                       <td className="px-2 py-2.5 font-medium">
                         {job.coiDocument.fileName}
                       </td>
-                      <td className="px-2 py-2.5 capitalize text-muted-foreground">
-                        {job.coiDocument.intakeSource.toLowerCase()}
+                      <td className="px-2 py-2.5">
+                        <IntakeSourceBadge source={job.coiDocument.intakeSource} />
                       </td>
                       <td className="px-2 py-2.5">
                         <JobStatusBadge
