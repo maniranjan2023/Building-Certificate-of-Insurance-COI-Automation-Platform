@@ -1,11 +1,12 @@
 import { chatWithGroqFallback } from "@/lib/ai/groq-client";
-import { getEnv } from "@/lib/env";
+import { defineInputGuardrail, defineOutputGuardrail } from "@/lib/ai/agents-sdk";
 import type { z } from "zod";
 
 export interface GuardrailFunctionOutput {
   tripwireTriggered: boolean;
   outputInfo: unknown;
 }
+
 const INJECTION_PATTERNS = [
   "ignore previous instructions",
   "ignore all previous",
@@ -115,26 +116,90 @@ export function checklistOutputGuard(
     return { tripwireTriggered: false, outputInfo: "Checklist output valid" };
   } catch {
     return { tripwireTriggered: true, outputInfo: "Invalid checklist JSON" };
-  }
+  };
 }
 
-export async function runInputGuardrails(
-  input: string,
-  options?: { skipLlm?: boolean }
-): Promise<{ passed: boolean; reason?: string }> {
-  const rule = ruleBasedInjectionGuard(input);
-  if (rule.tripwireTriggered) {
-    return { passed: false, reason: String(rule.outputInfo) };
-  }
-  if (!options?.skipLlm && input.length > 200) {
-    const llm = await llmSafetyGuard(input);
-    if (llm.tripwireTriggered) {
-      return { passed: false, reason: String(llm.outputInfo) };
+/** Official SDK input guardrail — prompt injection (runInParallel: false per docs). */
+export const coiInjectionInputGuardrail = defineInputGuardrail({
+  name: "coi_prompt_injection",
+  runInParallel: false,
+  execute: async ({ input }) => {
+    const text = typeof input === "string" ? input : JSON.stringify(input);
+    return ruleBasedInjectionGuard(text);
+  },
+});
+
+/** Official SDK input guardrail — LLM safety check for OCR/document text. */
+export const coiLlmSafetyInputGuardrail = defineInputGuardrail({
+  name: "coi_llm_safety",
+  runInParallel: false,
+  execute: async ({ input }) => {
+    const text = typeof input === "string" ? input : JSON.stringify(input);
+    if (text.length <= 200) {
+      return { tripwireTriggered: false, outputInfo: "Input too short for LLM safety check" };
     }
+    return llmSafetyGuard(text);
+  },
+});
+
+export function coiInputGuardrailSet(options: { includeLlmSafety?: boolean } = {}) {
+  const guardrails = [coiInjectionInputGuardrail];
+  if (options.includeLlmSafety) {
+    guardrails.push(coiLlmSafetyInputGuardrail);
   }
-  return { passed: true };
+  return guardrails;
 }
 
-export function getGuardrailModel(): string {
-  return getEnv().GROQ_GUARDRAIL_MODEL;
+/** Official SDK output guardrail — Zod JSON schema validation. */
+export function zodJsonOutputGuardrail<T>(name: string, schema: z.ZodSchema<T>) {
+  return defineOutputGuardrail({
+    name: `zod_${name}`,
+    execute: async ({ agentOutput }) => {
+      const raw =
+        typeof agentOutput === "string" ? agentOutput : JSON.stringify(agentOutput);
+      return validateWithSchema(schema, raw);
+    },
+  });
+}
+
+/** Official SDK output guardrail — checklist PASS/FAIL/MISSING only. */
+export function checklistItemsOutputGuardrail(expectedCount: number) {
+  return defineOutputGuardrail({
+    name: "checklist_items",
+    execute: async ({ agentOutput }) => {
+      const raw =
+        typeof agentOutput === "string" ? agentOutput : JSON.stringify(agentOutput);
+      return checklistOutputGuard(raw, expectedCount);
+    },
+  });
+}
+
+/** Official SDK output guardrail — report missingItems must match checklist labels. */
+export function reportMissingItemsOutputGuardrail(allowedMissingLabels: string[]) {
+  return defineOutputGuardrail({
+    name: "report_missing_items",
+    execute: async ({ agentOutput }) => {
+      const raw =
+        typeof agentOutput === "string" ? agentOutput : JSON.stringify(agentOutput);
+      try {
+        const data = JSON.parse(raw) as { missingItems?: string[] };
+        const allowed = new Set(allowedMissingLabels.map((l) => l.trim().toLowerCase()));
+        const invented = (data.missingItems ?? []).filter(
+          (m) => !allowed.has(m.trim().toLowerCase())
+        );
+        if (invented.length > 0) {
+          return {
+            tripwireTriggered: true,
+            outputInfo: `Report missingItems must use checklist requirement labels only. Unknown: ${invented.join(", ")}`,
+          };
+        }
+        return { tripwireTriggered: false, outputInfo: "Report missingItems valid" };
+      } catch {
+        return {
+          tripwireTriggered: true,
+          outputInfo: "Report output is not valid JSON",
+        };
+      }
+    },
+  });
 }

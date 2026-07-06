@@ -1,11 +1,17 @@
 import { buildRiskFromChecklist } from "@/lib/ai/checklist-rules";
-import { chatWithGroqFallback } from "@/lib/ai/groq-client";
 import {
-  checklistOutputGuard,
-  runInputGuardrails,
+  checklistItemsOutputGuardrail,
+  coiInputGuardrailSet,
+  reportMissingItemsOutputGuardrail,
   validateWithSchema,
-  type GuardrailFunctionOutput,
+  zodJsonOutputGuardrail,
 } from "@/lib/ai/guardrails";
+import {
+  executeInputGuardrails,
+  executeOutputGuardrails,
+  throwInputGuardrailTripwire,
+} from "@/lib/ai/guardrail-runner";
+import { chatWithGroqFallback } from "@/lib/ai/groq-client";
 import {
   checklistAgentOutputSchema,
   documentAgentOutputSchema,
@@ -18,23 +24,23 @@ import {
   type ReportAgentOutput,
   type RiskAgentOutput,
 } from "@/lib/ai/schemas";
+import type { InputGuardrailDefinition, OutputGuardrailDefinition } from "@/lib/ai/agents-sdk";
 import type { ChecklistItem } from "@prisma/client";
 import type { z } from "zod";
-
-export class GuardrailTripwireError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "GuardrailTripwireError";
-  }
-}
 
 async function runJsonAgent<T>(options: {
   name: string;
   instructions: string;
   input: string;
   schema: z.ZodSchema<T>;
-  outputGuard?: (raw: string) => GuardrailFunctionOutput;
+  inputGuardrails?: InputGuardrailDefinition[];
+  outputGuardrails?: OutputGuardrailDefinition[];
 }): Promise<{ data: T; raw: string; model: string }> {
+  await executeInputGuardrails(
+    options.input,
+    options.inputGuardrails ?? coiInputGuardrailSet({ includeLlmSafety: false })
+  );
+
   const systemPrompt = `${options.instructions}\n\nRespond with valid JSON only. No markdown fences.`;
 
   const { content, model } = await chatWithGroqFallback({
@@ -45,16 +51,15 @@ async function runJsonAgent<T>(options: {
     responseFormat: "json_object",
   });
 
-  if (options.outputGuard) {
-    const guard = options.outputGuard(content);
-    if (guard.tripwireTriggered) {
-      throw new GuardrailTripwireError(String(guard.outputInfo));
-    }
-  }
+  const outputGuardrails = [
+    zodJsonOutputGuardrail(options.name, options.schema),
+    ...(options.outputGuardrails ?? []),
+  ];
+  await executeOutputGuardrails(content, outputGuardrails);
 
   const validated = validateWithSchema(options.schema, content);
-  if (validated.tripwireTriggered || !validated.parsed) {
-    throw new GuardrailTripwireError(String(validated.outputInfo));
+  if (!validated.parsed) {
+    throw new Error(String(validated.outputInfo));
   }
 
   return { data: validated.parsed, raw: content, model };
@@ -63,17 +68,14 @@ async function runJsonAgent<T>(options: {
 export async function runDocumentAgent(
   documentBundle: string
 ): Promise<DocumentAgentOutput & { raw: string; model: string }> {
-  const pre = await runInputGuardrails(documentBundle);
-  if (!pre.passed) {
-    throw new GuardrailTripwireError(pre.reason ?? "Input guardrail failed");
-  }
-
+  const input = documentBundle.slice(0, 120000);
   const result = await runJsonAgent({
     name: "document-agent",
     instructions: `You classify insurance documents. Determine if the text is a Certificate of Insurance (COI).
 Return JSON: { "isCoi": boolean, "documentType": string, "confidence": number, "cleanText": string, "notes"?: string }`,
-    input: documentBundle.slice(0, 120000),
+    input,
     schema: documentAgentOutputSchema,
+    inputGuardrails: coiInputGuardrailSet({ includeLlmSafety: true }),
   });
 
   return { ...result.data, raw: result.raw, model: result.model };
@@ -82,11 +84,6 @@ Return JSON: { "isCoi": boolean, "documentType": string, "confidence": number, "
 export async function runExtractionAgent(
   cleanText: string
 ): Promise<ExtractionAgentOutput & { raw: string; model: string }> {
-  const pre = await runInputGuardrails(cleanText.slice(0, 50000), { skipLlm: true });
-  if (!pre.passed) {
-    throw new GuardrailTripwireError(pre.reason ?? "Input guardrail failed");
-  }
-
   const result = await runJsonAgent({
     name: "extraction-agent",
     instructions: `Extract structured COI fields from the text. Use null if not explicitly stated — never guess or infer values.
@@ -94,6 +91,7 @@ All string fields must be plain strings (not nested objects). endorsements must 
 Return JSON with keys: carrierName, policyNumber, namedInsured, additionalInsured, certificateHolder, effectiveDate, expirationDate, generalLiabilityLimit, endorsements (array of strings).`,
     input: cleanText.slice(0, 100000),
     schema: extractionAgentOutputSchema,
+    inputGuardrails: coiInputGuardrailSet({ includeLlmSafety: false }),
   });
 
   return {
@@ -110,7 +108,8 @@ export async function runChecklistAgent(
   documentText: string
 ): Promise<ChecklistAgentOutput & { raw: string; model: string }> {
   if (checklist.length === 0) {
-    throw new GuardrailTripwireError(
+    throwInputGuardrailTripwire(
+      "checklist_not_empty",
       "Checklist is empty — run ensureDefaultChecklistItems or add items in /checklist"
     );
   }
@@ -134,11 +133,6 @@ export async function runChecklistAgent(
     })),
   });
 
-  const pre = await runInputGuardrails(payload, { skipLlm: true });
-  if (!pre.passed) {
-    throw new GuardrailTripwireError(pre.reason ?? "Input guardrail failed");
-  }
-
   const result = await runJsonAgent({
     name: "checklist-agent",
     instructions: `You are a COI compliance checklist agent. Evaluate each checklist requirement against the COI documentText (primary source of truth) and extractedFields (secondary).
@@ -156,7 +150,8 @@ Return JSON: { "items": [{ "checklistItemId", "label", "status", "evidence", "ma
 Set mandatoryFailures to the label (requirement text) of each mandatory item that is FAIL or MISSING. Set allPassed true only when every mandatory item has status PASS.`,
     input: payload,
     schema: checklistAgentOutputSchema,
-    outputGuard: (raw) => checklistOutputGuard(raw, checklist.length),
+    inputGuardrails: coiInputGuardrailSet({ includeLlmSafety: false }),
+    outputGuardrails: [checklistItemsOutputGuardrail(checklist.length)],
   });
 
   const mandatoryFailures = result.data.items
@@ -182,11 +177,6 @@ export async function runRiskAgent(
   const payload = JSON.stringify({ extraction, checklistResult });
   const grounded = buildRiskFromChecklist(checklistResult);
 
-  const pre = await runInputGuardrails(payload, { skipLlm: true });
-  if (!pre.passed) {
-    throw new GuardrailTripwireError(pre.reason ?? "Input guardrail failed");
-  }
-
   const result = await runJsonAgent({
     name: "risk-agent",
     instructions: `Analyze compliance risk from extraction and checklist results only. Do not invent missing items.
@@ -199,6 +189,7 @@ Return JSON:
 - confidenceScore: number 0-1`,
     input: payload,
     schema: riskAgentOutputSchema,
+    inputGuardrails: coiInputGuardrailSet({ includeLlmSafety: false }),
   });
 
   return {
@@ -226,11 +217,9 @@ export async function runReportAgent(options: {
   risk: RiskAgentOutput;
 }): Promise<ReportAgentOutput & { raw: string; model: string }> {
   const payload = JSON.stringify(options);
-
-  const pre = await runInputGuardrails(payload);
-  if (!pre.passed) {
-    throw new GuardrailTripwireError(pre.reason ?? "Input guardrail failed");
-  }
+  const allowedMissing = options.checklistResult.items
+    .filter((i) => i.status !== "PASS")
+    .map((i) => i.label);
 
   const result = await runJsonAgent({
     name: "report-agent",
@@ -239,29 +228,8 @@ missingItems must list checklist requirement labels (e.g. "General liability per
 Return JSON: summary, recommendation (accept|reject|manual_review), recommendationReason, missingItems[], matchedItems[], citations[{claim,quote}], suggestedEmailBody, confidenceScore.`,
     input: payload,
     schema: reportAgentOutputSchema,
-    outputGuard: (raw) => {
-      const validated = validateWithSchema(reportAgentOutputSchema, raw);
-      if (validated.tripwireTriggered) return validated;
-
-      const allowedMissing = new Set(
-        options.checklistResult.items
-          .filter((i) => i.status !== "PASS")
-          .map((i) => i.label.trim().toLowerCase())
-      );
-
-      const reportMissing = validated.parsed?.missingItems ?? [];
-      const invented = reportMissing.filter(
-        (m) => !allowedMissing.has(m.trim().toLowerCase())
-      );
-
-      if (invented.length > 0) {
-        return {
-          tripwireTriggered: true,
-          outputInfo: `Report missingItems must use checklist requirement labels only. Unknown: ${invented.join(", ")}`,
-        };
-      }
-      return validated;
-    },
+    inputGuardrails: coiInputGuardrailSet({ includeLlmSafety: true }),
+    outputGuardrails: [reportMissingItemsOutputGuardrail(allowedMissing)],
   });
 
   return { ...result.data, raw: result.raw, model: result.model };
@@ -279,3 +247,9 @@ export function getSuggestedTemplate(
   }
   return "all_matched";
 }
+
+// Re-export official SDK tripwire types for pipeline / tests
+export {
+  InputGuardrailTripwireTriggered,
+  OutputGuardrailTripwireTriggered,
+} from "@/lib/ai/agents-sdk";
