@@ -11,6 +11,11 @@ import {
   guardrailTripwireMessage,
   isGuardrailTripwireError,
 } from "@/lib/ai/guardrail-runner";
+import {
+  buildGuardrailBlockPayload,
+  buildGuardrailCitationFromError,
+  persistGuardrailBlockOnVersion,
+} from "@/lib/services/guardrail-email";
 import { reconcileChecklistResults } from "@/lib/ai/checklist-rules";
 import { buildDocumentBundle, parseDocumentBuffer } from "@/lib/ai/llamaparse";
 import type { ProcessCoiJobData } from "@/lib/queue/coi-queue";
@@ -81,6 +86,7 @@ export interface PipelineResult {
   suggestedTemplate: string;
   stoppedEarly: boolean;
   exitReason?: string;
+  guardrailBlocked?: boolean;
 }
 
 export async function runCoiAiPipeline(
@@ -302,9 +308,38 @@ export async function runCoiAiPipeline(
       } catch (error) {
         const message =
           error instanceof Error ? error.message : "Pipeline failed unexpectedly";
-        const status = isGuardrailTripwireError(error)
-          ? AiRunStatus.STOPPED_EARLY
-          : AiRunStatus.FAILED;
+        const guardrailTrip = isGuardrailTripwireError(error);
+
+        if (aiRun && guardrailTrip) {
+          const tripwire = guardrailTripwireMessage(error);
+          const citation = buildGuardrailCitationFromError(
+            error,
+            aiRun.currentStepLabel
+          );
+          const payload = buildGuardrailBlockPayload({
+            citations: citation ? [citation] : [],
+          });
+
+          await persistGuardrailBlockOnVersion(versionId, payload);
+          await failAiRun(aiRun.id, tripwire, AiRunStatus.STOPPED_EARLY, {
+            suggestedTemplate: "guardrail_blocked",
+          });
+
+          logInfo("pipeline.guardrail_blocked", {
+            coiJobId: data.coiJobId,
+            tripwire,
+            agent: aiRun.currentStepLabel,
+          });
+
+          return {
+            suggestedTemplate: "guardrail_blocked",
+            stoppedEarly: true,
+            exitReason: tripwire,
+            guardrailBlocked: true,
+          };
+        }
+
+        const status = guardrailTrip ? AiRunStatus.STOPPED_EARLY : AiRunStatus.FAILED;
 
         if (aiRun) {
           await failAiRun(aiRun.id, message, status);

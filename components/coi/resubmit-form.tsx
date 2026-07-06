@@ -1,12 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Upload } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { CloudUpload, RefreshCw } from "lucide-react";
+import { LoadingButton } from "@/components/ui/loading-button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 interface ResubmitFormProps {
   documentId: string;
@@ -15,10 +14,12 @@ interface ResubmitFormProps {
 
 export function ResubmitForm({ documentId, senderEmail }: ResubmitFormProps) {
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -50,6 +51,7 @@ export function ResubmitForm({ documentId, senderEmail }: ResubmitFormProps) {
       const versionNumber = payload.data?.version?.versionNumber;
       setSuccess(`Created v${versionNumber}. Redirecting...`);
       setFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
       if (newDocId) {
         router.push(`/dashboard/${newDocId}`);
       } else {
@@ -65,41 +67,71 @@ export function ResubmitForm({ documentId, senderEmail }: ResubmitFormProps) {
   }
 
   return (
-    <Card className="gap-3 py-4">
-      <CardHeader className="gap-1 px-4 pb-0">
-        <CardTitle className="text-lg">Upload new version</CardTitle>
-        <CardDescription className="text-sm">
-          Resubmit for {senderEmail}. The next version number is assigned automatically.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="px-4 pb-4">
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="resubmit-file" className="text-sm">
-              Updated COI document
-            </Label>
-            <Input
-              id="resubmit-file"
-              type="file"
-              className="h-9 text-sm"
-              accept="application/pdf,image/jpeg,image/png,image/webp"
-              onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-            />
-          </div>
+    <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+      <div className="border-b px-4 py-3">
+        <div className="flex items-center gap-2">
+          <RefreshCw className="size-4 text-primary" />
+          <h2 className="font-semibold tracking-tight">Upload next version</h2>
+        </div>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          Resubmit for {senderEmail}
+        </p>
+      </div>
+      <form onSubmit={handleSubmit} className="space-y-3 p-4">
+        <div
+          role="button"
+          tabIndex={0}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              fileInputRef.current?.click();
+            }
+          }}
+          onClick={() => fileInputRef.current?.click()}
+          onDragOver={(event) => {
+            event.preventDefault();
+            setIsDragging(true);
+          }}
+          onDragLeave={() => setIsDragging(false)}
+          onDrop={(event) => {
+            event.preventDefault();
+            setIsDragging(false);
+            setFile(event.dataTransfer.files[0] ?? null);
+          }}
+          className={cn(
+            "flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 py-6 text-center transition-colors",
+            isDragging
+              ? "border-primary bg-primary/5"
+              : "border-muted-foreground/25 bg-muted/20 hover:border-primary/40"
+          )}
+        >
+          <CloudUpload className="size-6 text-muted-foreground" />
+          <p className="mt-2 text-sm font-medium">
+            {file ? file.name : "Drop updated COI or click to browse"}
+          </p>
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="sr-only"
+            accept="application/pdf,image/jpeg,image/png,image/webp"
+            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+          />
+        </div>
 
-          {error ? (
-            <p className="text-sm text-destructive">{error}</p>
-          ) : null}
-          {success ? (
-            <p className="text-sm text-emerald-400">{success}</p>
-          ) : null}
+        {error ? <p className="text-sm text-destructive">{error}</p> : null}
+        {success ? <p className="text-sm text-emerald-400">{success}</p> : null}
 
-          <Button type="submit" size="sm" disabled={isUploading}>
-            <Upload className="size-3.5" />
-            {isUploading ? "Uploading..." : "Upload next version"}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+        <LoadingButton
+          type="submit"
+          size="sm"
+          className="w-full"
+          loading={isUploading}
+          loadingText="Uploading…"
+          disabled={isUploading}
+        >
+          Upload next version
+        </LoadingButton>
+      </form>
+    </section>
   );
 }

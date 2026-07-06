@@ -225,6 +225,11 @@ export async function runReportAgent(options: {
     name: "report-agent",
     instructions: `Write admin-facing COI review report.
 missingItems must list checklist requirement labels (e.g. "General liability per occurrence limit") — NOT extraction field names like carrierName or additionalInsured.
+For suggestedEmailBody, write a professional tenant email using these placeholders (do not use bracket placeholders like [Your Name]):
+- {{sender_name}} for tenant name
+- {{missing_items}} for bullet list of issues
+- {{version_number}}, {{expiry_date}}, {{policy_number}}, {{carrier_name}} when relevant
+- End with signature lines: {{signatory_name}}, {{signatory_title}}, {{company_name}}
 Return JSON: summary, recommendation (accept|reject|manual_review), recommendationReason, missingItems[], matchedItems[], citations[{claim,quote}], suggestedEmailBody, confidenceScore.`,
     input: payload,
     schema: reportAgentOutputSchema,

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
+import { getRequestPathname } from "@/lib/server/request-pathname";
 
 export default async function ChecklistLayout({
   children,
@@ -13,7 +14,11 @@ export default async function ChecklistLayout({
     redirect("/login");
   }
 
+  const pathname = await getRequestPathname("/checklist");
+
   return (
-    <DashboardShell userEmail={session.email}>{children}</DashboardShell>
+    <DashboardShell userEmail={session.email} initialPathname={pathname}>
+      {children}
+    </DashboardShell>
   );
 }
