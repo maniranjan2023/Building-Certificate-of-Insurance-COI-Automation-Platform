@@ -1,27 +1,26 @@
 import { listCoiDocumentsWithLatestJob } from "@/lib/services/coi";
+import { computePortfolioStats } from "@/lib/services/dashboard-stats";
 import { CoiUploadForm } from "@/components/coi/coi-upload-form";
-import { CoiTable } from "@/components/coi/coi-table";
+import { CoiPortfolio } from "@/components/coi/coi-portfolio";
+import { PortfolioHero } from "@/components/dashboard/portfolio-hero";
 
 export default async function DashboardPage() {
   const documents = await listCoiDocumentsWithLatestJob();
+  const stats = computePortfolioStats(documents);
 
   return (
-    <div className="space-y-4">
-      <div className="rounded-lg border bg-card p-4 shadow-sm">
-        <p className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
-          Portfolio
-        </p>
-        <h2 className="mt-1 text-2xl font-semibold tracking-tight">
-          Certificate of Insurance submissions
-        </h2>
-        <p className="mt-1.5 max-w-2xl text-sm text-muted-foreground">
-          Upload tenant COIs or receive them via email. Each submission enqueues a
-          BullMQ job for processing.
-        </p>
-      </div>
+    <div className="space-y-6">
+      <PortfolioHero stats={stats} />
 
-      <CoiUploadForm />
-      <CoiTable documents={documents} />
+      <div className="grid gap-6 xl:grid-cols-[minmax(280px,340px)_1fr]">
+        <aside className="xl:sticky xl:top-20 xl:self-start">
+          <CoiUploadForm />
+        </aside>
+
+        <section className="min-w-0 rounded-2xl border bg-card/60 p-5 shadow-sm backdrop-blur-sm md:p-6">
+          <CoiPortfolio documents={documents} />
+        </section>
+      </div>
     </div>
   );
 }

@@ -1,11 +1,13 @@
 import {
   BarChart3,
   ClipboardCheck,
+  History,
   LayoutDashboard,
   ListTodo,
   Mail,
   type LucideIcon,
 } from "lucide-react";
+import { normalizePathname } from "@/lib/utils/pathname";
 
 export interface NavItem {
   href: string;
@@ -27,8 +29,8 @@ export const dashboardNavigation: NavSection[] = [
     items: [
       {
         href: "/dashboard",
-        label: "COI Dashboard",
-        description: "Uploads & submissions",
+        label: "Portfolio",
+        description: "Submissions, versions, and review queue",
         icon: LayoutDashboard,
         enabled: true,
       },
@@ -37,6 +39,13 @@ export const dashboardNavigation: NavSection[] = [
         label: "Job Queue",
         description: "BullMQ status & DLQ",
         icon: ListTodo,
+        enabled: true,
+      },
+      {
+        href: "/tenants",
+        label: "Tenant Activity",
+        description: "Uploads, emails & AI logs",
+        icon: History,
         enabled: true,
       },
     ],
@@ -61,8 +70,7 @@ export const dashboardNavigation: NavSection[] = [
         label: "Email Templates",
         description: "Tenant notifications",
         icon: Mail,
-        enabled: false,
-        badge: "Soon",
+        enabled: true,
       },
       {
         href: "/metrics",
@@ -75,6 +83,70 @@ export const dashboardNavigation: NavSection[] = [
     ],
   },
 ];
+
+export const PRODUCT_NAME = "COI Platform";
+
+export function getActiveNavContext(pathname: string): {
+  section: NavSection | null;
+  item: NavItem | null;
+} {
+  const path = normalizePathname(pathname);
+
+  for (const section of dashboardNavigation) {
+    const items = section.items
+      .filter((item) => item.enabled)
+      .sort((a, b) => b.href.length - a.href.length);
+
+    const item = items.find(
+      (entry) => path === entry.href || path.startsWith(`${entry.href}/`)
+    );
+
+    if (item) {
+      return { section, item };
+    }
+  }
+
+  return { section: null, item: null };
+}
+
+/** Sub-page label when pathname goes deeper than the nav item href. */
+export function getSubPageLabel(
+  pathname: string,
+  parentHref?: string | null
+): string | null {
+  const path = normalizePathname(pathname);
+
+  if (path.startsWith("/dashboard/compare")) {
+    return "Compare versions";
+  }
+
+  if (parentHref === "/dashboard") {
+    const prefix = "/dashboard/";
+    if (path.startsWith(prefix)) {
+      const segment = path.slice(prefix.length);
+      if (
+        segment &&
+        !segment.includes("/") &&
+        segment !== "jobs" &&
+        segment !== "compare"
+      ) {
+        return "Submission review";
+      }
+    }
+  }
+
+  if (parentHref === "/tenants") {
+    const prefix = "/tenants/";
+    if (path.startsWith(prefix)) {
+      const segment = path.slice(prefix.length);
+      if (segment && !segment.includes("/")) {
+        return "Tenant profile";
+      }
+    }
+  }
+
+  return null;
+}
 
 export function getInitials(email: string): string {
   const localPart = email.split("@")[0] ?? "A";

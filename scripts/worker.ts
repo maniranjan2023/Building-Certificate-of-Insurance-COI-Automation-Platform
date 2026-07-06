@@ -2,13 +2,26 @@ import { createCoiWorker } from "@/lib/workers/coi-worker";
 import { ensureDefaultChecklistItems } from "@/lib/services/checklist";
 import { logInfo } from "@/lib/observability/logfire.node";
 import { getEnv, isDlqTestMode, shouldSendToLogfire } from "@/lib/env";
+import { ensureDatabaseReady, withDbRetry } from "@/lib/utils/db-retry";
 
 async function main(): Promise<void> {
   const env = getEnv();
-  const restored = await ensureDefaultChecklistItems();
+
+  console.log("Connecting to Neon PostgreSQL (may take a few seconds if DB is idle)…");
+  await ensureDatabaseReady();
+
+  const restored = await withDbRetry(() => ensureDefaultChecklistItems(), {
+    label: "checklist seed",
+  });
   if (restored > 0) {
     console.log(`Checklist: ensured ${restored} default item(s) in database`);
   }
+
+  const { ensureDefaultEmailTemplates } = await import("@/lib/services/email-templates");
+  await withDbRetry(() => ensureDefaultEmailTemplates(), {
+    label: "email template seed",
+  });
+  console.log("Email templates: defaults ensured in database");
 
   const worker = createCoiWorker();
 

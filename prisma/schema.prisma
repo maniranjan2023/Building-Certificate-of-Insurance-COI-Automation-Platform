@@ -99,6 +99,7 @@ model CoiVersion {
   fieldBoundingBoxes Json?
   jobs            CoiJob[]
   aiRuns          AiRun[]
+  outboundEmails  OutboundEmail[]
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
@@ -185,4 +186,41 @@ model AgentStep {
 model ProcessedWebhookEvent {
   messageId String   @id
   createdAt DateTime @default(now())
+}
+
+enum OutboundEmailStatus {
+  QUEUED
+  SENT
+  FAILED
+}
+
+model EmailTemplate {
+  key       String   @id
+  name      String
+  subject   String
+  body      String   @db.Text
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  emails    OutboundEmail[]
+}
+
+model OutboundEmail {
+  id                 String              @id @default(cuid())
+  coiVersionId       String
+  coiVersion         CoiVersion          @relation(fields: [coiVersionId], references: [id], onDelete: Cascade)
+  templateKey        String
+  template           EmailTemplate       @relation(fields: [templateKey], references: [key], onDelete: Restrict)
+  toEmail            String
+  subject            String
+  body               String              @db.Text
+  status             OutboundEmailStatus @default(QUEUED)
+  agentMailMessageId String?
+  errorMessage       String?
+  sentAt             DateTime?
+  createdAt          DateTime            @default(now())
+
+  @@index([coiVersionId])
+  @@index([templateKey])
+  @@index([createdAt])
 }

@@ -36,10 +36,14 @@ export function NavUser({ userEmail }: { userEmail: string }) {
               size="sm"
               className="h-9 data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
-              <Avatar className="h-6 w-6 rounded-md">
+              <Avatar className="relative h-6 w-6 rounded-md">
                 <AvatarFallback className="rounded-md text-[11px]">
                   {getInitials(userEmail)}
                 </AvatarFallback>
+                <span
+                  className="absolute -right-0.5 -bottom-0.5 size-2 rounded-full border-2 border-sidebar bg-emerald-500"
+                  aria-hidden
+                />
               </Avatar>
               <div className="grid flex-1 text-left leading-tight">
                 <span className="truncate text-sm font-medium">Admin</span>

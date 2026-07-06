@@ -167,7 +167,8 @@ export async function completeAiRun(
 export async function failAiRun(
   aiRunId: string,
   exitReason: string,
-  status: AiRunStatus = AiRunStatus.FAILED
+  status: AiRunStatus = AiRunStatus.FAILED,
+  options?: { suggestedTemplate?: string | null }
 ): Promise<AiRun> {
   return prisma.aiRun.update({
     where: { id: aiRunId },
@@ -176,6 +177,7 @@ export async function failAiRun(
       completedAt: new Date(),
       exitReason,
       currentStepLabel: null,
+      suggestedTemplate: options?.suggestedTemplate ?? undefined,
     },
   });
 }

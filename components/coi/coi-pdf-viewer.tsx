@@ -41,10 +41,10 @@ export function CoiPdfViewer({ pdfUrl }: CoiPdfViewerProps) {
   }, []);
 
   return (
-    <div className="space-y-3">
+    <div className="min-w-0 space-y-3">
       <div
         ref={containerRef}
-        className="max-h-[80vh] overflow-auto rounded-lg border bg-muted/30 p-3"
+        className="max-h-[75vh] max-w-full overflow-auto rounded-xl border bg-muted/30 p-3"
       >
         <Document
           file={pdfFile}
@@ -71,7 +71,7 @@ export function CoiPdfViewer({ pdfUrl }: CoiPdfViewerProps) {
                 <p className="mb-2 text-center text-xs font-medium text-muted-foreground">
                   Page {pageNumber} of {numPages}
                 </p>
-                <div className="mx-auto w-fit rounded border bg-white shadow-sm">
+                <div className="mx-auto w-fit max-w-full rounded border bg-white shadow-sm">
                   <Page
                     pageNumber={pageNumber}
                     width={pageWidth}

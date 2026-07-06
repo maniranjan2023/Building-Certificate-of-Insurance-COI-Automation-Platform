@@ -1,9 +1,25 @@
 import { JobStatus, JobType, type CoiJob, type Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { enqueueProcessCoiJob, type EnqueueProcessCoiOptions } from "@/lib/queue/coi-queue";
+import {
+  enqueueProcessCoiJob,
+  enqueueSendTemplateEmailJob as queueSendTemplateEmail,
+  type EnqueueProcessCoiOptions,
+} from "@/lib/queue/coi-queue";
 import { getEnv } from "@/lib/env";
 
 export { JOB_STATUS_LABELS } from "@/lib/constants/job-status";
+
+export interface SendTemplateEmailEnqueueData {
+  coiVersionId: string;
+  coiDocumentId: string;
+  templateKey: string;
+  toEmail: string;
+  customBody?: string;
+  customSubject?: string;
+  rejectionReason?: string;
+  agentMailMessageId?: string;
+  agentMailInboxId?: string;
+}
 
 export type CoiJobWithRelations = Prisma.CoiJobGetPayload<{
   include: {
@@ -34,6 +50,28 @@ export async function createProcessCoiJob(
     coiVersionId,
     options
   );
+
+  return prisma.coiJob.update({
+    where: { id: job.id },
+    data: { bullmqJobId },
+  });
+}
+
+export async function enqueueSendTemplateEmailJob(
+  data: SendTemplateEmailEnqueueData
+): Promise<CoiJob> {
+  const env = getEnv();
+  const job = await prisma.coiJob.create({
+    data: {
+      coiVersionId: data.coiVersionId,
+      coiDocumentId: data.coiDocumentId,
+      queueName: env.BULLMQ_COI_QUEUE,
+      type: JobType.SEND_TEMPLATE_EMAIL,
+      status: JobStatus.QUEUED,
+    },
+  });
+
+  const bullmqJobId = await queueSendTemplateEmail(job.id, data);
 
   return prisma.coiJob.update({
     where: { id: job.id },
