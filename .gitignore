@@ -65,3 +65,5 @@ uploads/
 tmp/
 temp/
 *.tmp
+
+testsprite_tests\tmp\config.json

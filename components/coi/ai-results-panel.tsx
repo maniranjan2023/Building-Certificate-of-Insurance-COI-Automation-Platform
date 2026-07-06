@@ -103,26 +103,26 @@ export function AiResultsPanel({ version, aiRun, hideTimeline }: AiResultsPanelP
   }
 
   return (
-    <div className="space-y-4">
-      <Card className="gap-3 py-4">
-        <CardHeader className="gap-1 px-4 pb-0">
-          <CardTitle className="text-lg">AI analysis</CardTitle>
-          <CardDescription className="text-sm">
+    <div className="min-w-0 space-y-4">
+      <section className="min-w-0 overflow-hidden rounded-2xl border bg-card shadow-sm">
+        <div className="border-b px-5 py-4">
+          <h2 className="text-lg font-semibold tracking-tight">AI analysis</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
             {version.aiSuggestedTemplate
               ? `Suggested template: ${version.aiSuggestedTemplate.replace(/_/g, " ")}`
               : "Pipeline output from document → extraction → checklist → risk → report"}
-          </CardDescription>
-        </CardHeader>
+          </p>
+        </div>
         {aiRun ? (
-          <CardContent className="px-4 pb-4 text-sm">
+          <div className="px-5 py-4 text-sm">
             <p className="text-muted-foreground">
               Run status:{" "}
               <span className="font-medium text-foreground">{aiRun.status}</span>
               {aiRun.exitReason ? ` · ${aiRun.exitReason}` : ""}
             </p>
-          </CardContent>
+          </div>
         ) : null}
-      </Card>
+      </section>
 
       {extraction ? (
         <Card className="gap-3 py-4">
@@ -208,7 +208,7 @@ export function AiResultsPanel({ version, aiRun, hideTimeline }: AiResultsPanelP
           <CardHeader className="gap-1 px-4 pb-0">
             <CardTitle className="text-lg">Draft report</CardTitle>
             <CardDescription className="text-sm">
-              Admin can edit and send in Phase 5
+              Edit before sending tenant notification
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 px-4 pb-4 text-sm">

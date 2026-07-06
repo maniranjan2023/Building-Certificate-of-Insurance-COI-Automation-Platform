@@ -3,8 +3,9 @@ import { runCoiAiPipeline } from "@/lib/ai/pipeline";
 import { isDlqTestMode } from "@/lib/env";
 import type { ProcessCoiJobData } from "@/lib/queue/coi-queue";
 import { sendAutoIntakeEmail } from "@/lib/services/intake-email";
+import { enqueueSendTemplateEmailJob } from "@/lib/services/jobs";
 import { updateCoiJobStatus } from "@/lib/services/jobs";
-import { logError } from "@/lib/observability/logfire.node";
+import { logError, logInfo } from "@/lib/observability/logfire.node";
 
 function shouldForceFail(data: ProcessCoiJobData): boolean {
   if (data.forceFail === true) {
@@ -34,6 +35,32 @@ async function notifyProcessingError(data: ProcessCoiJobData): Promise<void> {
   }
 }
 
+async function notifyGuardrailBlockEmail(data: ProcessCoiJobData): Promise<void> {
+  const email = data.senderEmail?.trim();
+  if (!email || !data.coiVersionId) {
+    return;
+  }
+
+  try {
+    await enqueueSendTemplateEmailJob({
+      coiVersionId: data.coiVersionId,
+      coiDocumentId: data.coiDocumentId,
+      templateKey: "guardrail_blocked",
+      toEmail: email,
+      agentMailMessageId: data.agentMailMessageId ?? undefined,
+      agentMailInboxId: data.agentMailInboxId ?? undefined,
+    });
+    logInfo("process-coi.guardrail_email_queued", {
+      coiJobId: data.coiJobId,
+      to: email,
+    });
+  } catch (error) {
+    logError("process-coi.guardrail_email_failed", error, {
+      coiJobId: data.coiJobId,
+    });
+  }
+}
+
 export async function handleProcessCoiJob(
   data: ProcessCoiJobData
 ): Promise<void> {
@@ -45,6 +72,15 @@ export async function handleProcessCoiJob(
     const result = await runCoiAiPipeline(data);
 
     if (result.exitReason === "document_deleted") {
+      return;
+    }
+
+    if (result.guardrailBlocked) {
+      await notifyGuardrailBlockEmail(data);
+      await updateCoiJobStatus(data.coiJobId, {
+        status: JobStatus.READY_FOR_REVIEW,
+        failureReason: result.exitReason ?? "Guardrail blocked automated review",
+      });
       return;
     }
 
