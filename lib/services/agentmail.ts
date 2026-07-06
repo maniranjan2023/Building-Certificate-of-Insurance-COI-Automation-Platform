@@ -18,10 +18,20 @@ export interface AgentMailAttachmentMeta {
 export interface AgentMailWebhookMessage {
   inbox_id?: string;
   message_id?: string;
-  from_?: string[];
+  /** AgentMail webhook uses `from` (string). Some payloads may use arrays. */
+  from?: string | string[];
+  /** @deprecated incorrect field name — kept for backwards compatibility */
+  from_?: string | string[];
   subject?: string;
   text?: string;
   attachments?: AgentMailAttachmentMeta[];
+}
+
+export interface AgentMailWebhookPayload {
+  event_type?: string;
+  type?: string;
+  event_id?: string;
+  message?: AgentMailWebhookMessage;
 }
 
 export interface DownloadedAttachment {
@@ -43,13 +53,29 @@ export function getInboxId(): string {
   return getEnv().INBOX_ID;
 }
 
-export function parseSenderEmail(from: string[] | undefined): string | null {
-  if (!from?.length) {
+export function parseSenderEmail(
+  from: string | string[] | undefined | null
+): string | null {
+  if (from == null) {
     return null;
   }
-  const raw = from[0];
+
+  const raw = Array.isArray(from) ? from[0] : from;
+  if (!raw?.trim()) {
+    return null;
+  }
+
   const match = raw.match(/<([^>]+)>/);
   return (match?.[1] ?? raw).trim().toLowerCase();
+}
+
+export function getMessageFromField(
+  message: AgentMailWebhookMessage | undefined
+): string | null {
+  if (!message) {
+    return null;
+  }
+  return parseSenderEmail(message.from ?? message.from_);
 }
 
 export function pickCoiAttachment(

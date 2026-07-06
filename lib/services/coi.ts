@@ -5,7 +5,8 @@ import {
   type CoiVersion,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { uploadCoiBuffer, uploadCoiDocument } from "@/lib/services/cloudinary";
+import { uploadCoiBuffer, uploadCoiDocument, deleteCloudinaryAsset } from "@/lib/services/cloudinary";
+import { removeCoiJobsFromQueues } from "@/lib/queue/coi-queue";
 import { createProcessCoiJob } from "@/lib/services/jobs";
 import { findOrCreateSender } from "@/lib/services/sender";
 import {
@@ -32,6 +33,13 @@ export class CoiValidationError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "CoiValidationError";
+  }
+}
+
+export class CoiNotFoundError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "CoiNotFoundError";
   }
 }
 
@@ -103,10 +111,14 @@ async function createCoiRecord(
 
 async function createSubmissionWithJob(
   document: CoiDocument,
-  senderEmail: string
+  senderEmail: string,
+  jobOptions?: import("@/lib/queue/coi-queue").EnqueueProcessCoiOptions
 ): Promise<{ document: CoiDocument; version: CoiVersion; job: CoiJob }> {
   const version = await createCoiVersionForDocument(document.id, senderEmail);
-  const job = await createProcessCoiJob(version.id, document.id);
+  const job = await createProcessCoiJob(version.id, document.id, {
+    ...jobOptions,
+    senderEmail: jobOptions?.senderEmail ?? senderEmail,
+  });
   return { document, version, job };
 }
 
@@ -134,9 +146,19 @@ export async function createCoiFromBufferWithJob(
   buffer: Buffer,
   fileName: string,
   mimeType: string,
-  senderEmail?: string | null
+  senderEmail?: string | null,
+  jobOptions?: import("@/lib/queue/coi-queue").EnqueueProcessCoiOptions
 ) {
   validateCoiBuffer(buffer, mimeType);
+
+  const email = senderEmail?.trim().toLowerCase();
+  if (!email || !email.includes("@")) {
+    throw new CoiValidationError(
+      "Email intake requires a valid sender email on the message."
+    );
+  }
+
+  await findOrCreateSender(email);
   const upload = await uploadCoiBuffer(buffer, fileName, mimeType);
   const document = await createCoiRecord(
     {
@@ -148,15 +170,7 @@ export async function createCoiFromBufferWithJob(
     upload
   );
 
-  const email = senderEmail?.trim().toLowerCase();
-  if (!email || !email.includes("@")) {
-    throw new CoiValidationError(
-      "Email intake requires a valid sender email on the message."
-    );
-  }
-
-  await findOrCreateSender(email);
-  return createSubmissionWithJob(document, email);
+  return createSubmissionWithJob(document, email, jobOptions);
 }
 
 export async function createResubmissionWithJob(
@@ -189,6 +203,69 @@ export async function getCoiDocumentById(
   id: string
 ): Promise<CoiDocument | null> {
   return prisma.coiDocument.findUnique({ where: { id } });
+}
+
+export async function deleteCoiDocumentById(id: string): Promise<void> {
+  const document = await prisma.coiDocument.findUnique({
+    where: { id },
+    include: {
+      version: true,
+      jobs: true,
+    },
+  });
+
+  if (!document) {
+    throw new CoiNotFoundError("COI document not found.");
+  }
+
+  await removeCoiJobsFromQueues(document.jobs);
+
+  try {
+    await deleteCloudinaryAsset(document.cloudinaryPublicId);
+  } catch {
+    // DB delete still proceeds if Cloudinary asset is already gone.
+  }
+
+  const versionId = document.version?.id;
+  const jobIds = document.jobs.map((job) => job.id);
+
+  await prisma.$transaction(async (tx) => {
+    const aiRunIds = new Set<string>();
+
+    if (jobIds.length) {
+      const runsFromJobs = await tx.aiRun.findMany({
+        where: { coiJobId: { in: jobIds } },
+        select: { id: true },
+      });
+      for (const run of runsFromJobs) aiRunIds.add(run.id);
+    }
+
+    if (versionId) {
+      const runsFromVersion = await tx.aiRun.findMany({
+        where: { coiVersionId: versionId },
+        select: { id: true },
+      });
+      for (const run of runsFromVersion) aiRunIds.add(run.id);
+    }
+
+    const aiRunIdList = [...aiRunIds];
+    if (aiRunIdList.length) {
+      await tx.agentStep.deleteMany({
+        where: { aiRunId: { in: aiRunIdList } },
+      });
+      await tx.aiRun.deleteMany({
+        where: { id: { in: aiRunIdList } },
+      });
+    }
+
+    await tx.coiJob.deleteMany({ where: { coiDocumentId: id } });
+
+    if (versionId) {
+      await tx.coiVersion.delete({ where: { id: versionId } });
+    }
+
+    await tx.coiDocument.delete({ where: { id } });
+  });
 }
 
 export async function getCoiDocumentByIdWithLatestJob(id: string) {

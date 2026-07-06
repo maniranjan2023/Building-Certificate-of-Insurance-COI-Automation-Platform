@@ -2,11 +2,13 @@ import { prisma } from "@/lib/prisma";
 import {
   downloadAttachment,
   getInboxId,
-  parseSenderEmail,
+  getMessageFromField,
   pickCoiAttachment,
   type AgentMailWebhookMessage,
 } from "@/lib/services/agentmail";
 import { createCoiFromBufferWithJob } from "@/lib/services/coi";
+import { sendAutoIntakeEmail } from "@/lib/services/intake-email";
+import { logError } from "@/lib/observability/logfire";
 
 export interface AgentMailWebhookPayload {
   event_type?: string;
@@ -57,20 +59,74 @@ export async function processAgentMailWebhook(
     return { processed: false, reason: "duplicate" };
   }
 
+  const senderEmail = getMessageFromField(message);
   const attachment = pickCoiAttachment(message?.attachments);
+
   if (!attachment) {
-    return { processed: false, reason: "no_valid_attachment" };
+    if (senderEmail) {
+      try {
+        await sendAutoIntakeEmail({
+          template: "missing_attachment",
+          to: senderEmail,
+          context: { senderEmail },
+          replyToMessageId: messageId,
+          inboxId,
+        });
+        console.log(
+          `[webhook] missing_attachment email sent to ${senderEmail} (message ${messageId})`
+        );
+      } catch (error) {
+        console.error(
+          `[webhook] missing_attachment email failed for ${senderEmail}:`,
+          error
+        );
+        logError("webhook.missing_attachment_email_failed", error, {
+          messageId,
+          senderEmail,
+        });
+      }
+    } else {
+      console.warn(
+        `[webhook] no_valid_attachment but sender email missing (message ${messageId})`
+      );
+    }
+
+    await markWebhookMessageProcessed(messageId);
+    return { processed: true, reason: "no_valid_attachment" };
   }
 
   const downloaded = await downloadAttachment(inboxId, messageId, attachment);
-  const senderEmail = parseSenderEmail(message?.from_);
 
-  await createCoiFromBufferWithJob(
+  const submission = await createCoiFromBufferWithJob(
     downloaded.buffer,
     downloaded.fileName,
     downloaded.mimeType,
-    senderEmail
+    senderEmail,
+    {
+      emailBodyText: message?.text ?? null,
+      agentMailMessageId: messageId,
+      agentMailInboxId: inboxId,
+      senderEmail: senderEmail ?? undefined,
+    }
   );
+
+  if (senderEmail) {
+    try {
+      await sendAutoIntakeEmail({
+        template: "receipt_acknowledged",
+        to: senderEmail,
+        context: {
+          senderEmail,
+          versionNumber: submission.version.versionNumber,
+          submissionDate: submission.document.createdAt,
+        },
+        replyToMessageId: messageId,
+        inboxId,
+      });
+    } catch (error) {
+      logError("webhook.receipt_ack_email_failed", error, { messageId });
+    }
+  }
 
   await markWebhookMessageProcessed(messageId);
 

@@ -1,6 +1,8 @@
 import { jsonError, jsonOk } from "@/lib/api-response";
 import { processAgentMailWebhook } from "@/lib/services/webhook-intake";
 
+export const runtime = "nodejs";
+
 export async function POST(request: Request) {
   try {
     const payload = await request.json();
