@@ -1,13 +1,16 @@
 import { AgentStepKind, AiRunStatus } from "@prisma/client";
 import {
   getSuggestedTemplate,
-  GuardrailTripwireError,
   runChecklistAgent,
   runDocumentAgent,
   runExtractionAgent,
   runReportAgent,
   runRiskAgent,
 } from "@/lib/ai/agents";
+import {
+  guardrailTripwireMessage,
+  isGuardrailTripwireError,
+} from "@/lib/ai/guardrail-runner";
 import { reconcileChecklistResults } from "@/lib/ai/checklist-rules";
 import { buildDocumentBundle, parseDocumentBuffer } from "@/lib/ai/llamaparse";
 import type { ProcessCoiJobData } from "@/lib/queue/coi-queue";
@@ -56,19 +59,17 @@ async function runTimedStep<T>(
     });
     return result;
   } catch (error) {
-    const tripwire =
-      error instanceof GuardrailTripwireError
+    const tripwire = isGuardrailTripwireError(error)
+      ? guardrailTripwireMessage(error)
+      : error instanceof Error
         ? error.message
-        : error instanceof Error
-          ? error.message
-          : "Unknown agent error";
+        : "Unknown agent error";
 
     await recordAgentStep(aiRunId, stepOrder, {
       kind,
       agentName,
       input: input as object,
-      guardrailPassed:
-        error instanceof GuardrailTripwireError ? false : undefined,
+      guardrailPassed: isGuardrailTripwireError(error) ? false : undefined,
       tripwireReason: tripwire,
       durationMs: Date.now() - started,
     });
@@ -301,10 +302,9 @@ export async function runCoiAiPipeline(
       } catch (error) {
         const message =
           error instanceof Error ? error.message : "Pipeline failed unexpectedly";
-        const status =
-          error instanceof GuardrailTripwireError
-            ? AiRunStatus.STOPPED_EARLY
-            : AiRunStatus.FAILED;
+        const status = isGuardrailTripwireError(error)
+          ? AiRunStatus.STOPPED_EARLY
+          : AiRunStatus.FAILED;
 
         if (aiRun) {
           await failAiRun(aiRun.id, message, status);
