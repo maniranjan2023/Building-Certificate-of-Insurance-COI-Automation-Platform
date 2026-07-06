@@ -3,7 +3,13 @@ import path from "path";
 
 const nextConfig: NextConfig = {
   outputFileTracingRoot: path.join(__dirname),
-  serverExternalPackages: ["bullmq", "ioredis", "agentmail"],
+  serverExternalPackages: [
+    "bullmq",
+    "ioredis",
+    "agentmail",
+    "@pydantic/logfire-node",
+    "logfire",
+  ],
   images: {
     remotePatterns: [
       {

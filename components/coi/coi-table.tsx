@@ -3,7 +3,8 @@ import { ExternalLink } from "lucide-react";
 import type { CoiSubmissionRow } from "@/lib/services/coi";
 import { JOB_STATUS_LABELS } from "@/lib/constants/job-status";
 import { COI_STATUS_LABELS } from "@/lib/services/version-labels";
-import { formatBytes, formatDate } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
+import { CoiDeleteButton } from "@/components/coi/coi-delete-button";
 import { IntakeSourceBadge } from "@/components/ui/intake-source-badge";
 import { JobStatusBadge } from "@/components/ui/job-status-badge";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -119,6 +120,10 @@ export function CoiTable({ documents }: CoiTableProps) {
                           Open
                         </a>
                       </Button>
+                      <CoiDeleteButton
+                        documentId={document.id}
+                        fileName={document.fileName}
+                      />
                     </div>
                   </td>
                 </tr>

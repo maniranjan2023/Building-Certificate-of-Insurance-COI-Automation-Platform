@@ -4,7 +4,7 @@
 
 1. **Neon PostgreSQL** — create a project and copy pooled + direct connection strings.
 2. **Cloudinary** — create an account and copy cloud name, API key, and API secret.
-3. Copy `.env.example` → `.env` and fill in all Phase 1 variables.
+3. Copy `.env` template from README **Environment Variables** section and fill in all Phase 1 variables.
 
 Generate a JWT secret (PowerShell):
 
@@ -68,7 +68,7 @@ curl http://localhost:3000/api/coi
 
 | Issue | Fix |
 |-------|-----|
-| `Invalid environment configuration` | Fill all vars in `.env` per `.env.example` |
+| `Invalid environment configuration` | Fill all required vars in `.env` (see README Environment Variables) |
 | Prisma connection error | Check `DATABASE_URL` / `DIRECT_URL`; ensure Neon DB is active |
 | Cloudinary upload failed | Verify API credentials and that the folder is allowed |
 | Login always fails | Confirm `ADMIN_EMAIL` matches exactly; check password or hash |

@@ -1,8 +1,15 @@
 import { createCoiWorker } from "@/lib/workers/coi-worker";
-import { getEnv, isDlqTestMode } from "@/lib/env";
+import { ensureDefaultChecklistItems } from "@/lib/services/checklist";
+import { logInfo } from "@/lib/observability/logfire.node";
+import { getEnv, isDlqTestMode, shouldSendToLogfire } from "@/lib/env";
 
 async function main(): Promise<void> {
   const env = getEnv();
+  const restored = await ensureDefaultChecklistItems();
+  if (restored > 0) {
+    console.log(`Checklist: ensured ${restored} default item(s) in database`);
+  }
+
   const worker = createCoiWorker();
 
   console.log(`BullMQ worker started — listening on ${env.BULLMQ_COI_QUEUE}`);
@@ -18,6 +25,13 @@ async function main(): Promise<void> {
     );
   } else {
     console.log("DLQ test mode OFF — jobs will process normally");
+  }
+
+  if (shouldSendToLogfire()) {
+    logInfo("worker.started", {
+      queue: env.BULLMQ_COI_QUEUE,
+      workerId: `worker-${process.pid}`,
+    });
   }
 
   const shutdown = async (signal: string) => {

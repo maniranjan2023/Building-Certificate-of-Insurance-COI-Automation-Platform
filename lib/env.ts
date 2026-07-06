@@ -44,6 +44,31 @@ const envSchema = z.object({
 
   WORKER_FORCE_FAIL: z.string().optional(),
 
+  // Phase 4 — Groq (OpenAI SDK compatible)
+  GROQ_API_KEY: z.string().optional(),
+  GROQ_BASE_URL: z.string().url().default("https://api.groq.com/openai/v1"),
+  GROQ_MODEL_PRIMARY: z.string().default("llama-3.3-70b-versatile"),
+  GROQ_MODEL_FALLBACK_1: z.string().default("llama-3.1-8b-instant"),
+  GROQ_MODEL_FALLBACK_2: z.string().default("mixtral-8x7b-32768"),
+  GROQ_GUARDRAIL_MODEL: z.string().default("llama-3.1-8b-instant"),
+  AI_MAX_RETRIES: z.coerce.number().int().min(0).default(2),
+  AI_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(1000).default(60000),
+
+  // Phase 4 — LlamaParse OCR
+  LLAMA_CLOUD_API_KEY: z.string().optional(),
+  LLAMAPARSE_TIER: z.string().default("agentic"),
+
+  // Phase 4 — Pydantic Logfire (https://pydantic.dev/docs/logfire/integrations/llms/openai/)
+  LOGFIRE_TOKEN: z.string().optional(),
+  LOGFIRE_SERVICE_NAME: z.string().default("coi-email-agent"),
+  LOGFIRE_ENVIRONMENT: z.string().default("development"),
+  LOGFIRE_SEND_TO_LOGFIRE: z
+    .enum(["true", "false", "if-token-present"])
+    .default("if-token-present"),
+  /** Mirror spans/logs to terminal (very noisy with auto-instrumentation). */
+  LOGFIRE_CONSOLE: z
+    .enum(["true", "false"])
+    .default("false"),
 });
 
 
@@ -167,6 +192,43 @@ export function getAgentMailApiKey(): string {
 
 export function isDlqTestMode(): boolean {
   return process.env.WORKER_FORCE_FAIL?.trim().toLowerCase() === "true";
+}
+
+export function getGroqApiKey(): string {
+  const key = getEnv().GROQ_API_KEY;
+  if (!key) {
+    throw new Error("GROQ_API_KEY is required for Phase 4 AI pipeline.");
+  }
+  return key;
+}
+
+export function getGroqModelChain(): string[] {
+  const env = getEnv();
+  return [
+    env.GROQ_MODEL_PRIMARY,
+    env.GROQ_MODEL_FALLBACK_1,
+    env.GROQ_MODEL_FALLBACK_2,
+  ];
+}
+
+export function getLlamaCloudApiKey(): string {
+  const key = getEnv().LLAMA_CLOUD_API_KEY;
+  if (!key) {
+    throw new Error("LLAMA_CLOUD_API_KEY is required for Phase 4 OCR.");
+  }
+  return key;
+}
+
+export function getLogfireToken(): string | undefined {
+  const token = getEnv().LOGFIRE_TOKEN?.trim();
+  return token || undefined;
+}
+
+export function shouldSendToLogfire(): boolean {
+  const env = getEnv();
+  if (env.LOGFIRE_SEND_TO_LOGFIRE === "true") return true;
+  if (env.LOGFIRE_SEND_TO_LOGFIRE === "false") return false;
+  return Boolean(getLogfireToken());
 }
 
 export function resetEnvCache(): void {

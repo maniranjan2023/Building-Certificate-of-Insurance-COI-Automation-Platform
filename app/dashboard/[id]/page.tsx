@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { CoiPdfViewer } from "@/components/coi/coi-pdf-viewer-dynamic";
+import { CoiPipelinePanel } from "@/components/coi/coi-pipeline-panel";
+import { getPipelineStatusForDocument } from "@/lib/services/pipeline-status";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import { getCoiDocumentByIdWithLatestJob } from "@/lib/services/coi";
@@ -13,6 +16,7 @@ import { JobStatusBadge } from "@/components/ui/job-status-badge";
 import { VersionBadge } from "@/components/ui/version-badge";
 import { VersionHistory } from "@/components/coi/version-history";
 import { VersionActions } from "@/components/coi/version-actions";
+import { CoiDeleteButton } from "@/components/coi/coi-delete-button";
 import { ResubmitForm } from "@/components/coi/resubmit-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,6 +36,8 @@ export default async function CoiDetailPage({ params }: CoiDetailPageProps) {
   const versions = document.version
     ? await listVersionsForDocument(id)
     : [];
+
+  const pipelineStatus = await getPipelineStatusForDocument(id);
 
   const isPdf = document.mimeType === "application/pdf";
 
@@ -79,8 +85,7 @@ export default async function CoiDetailPage({ params }: CoiDetailPageProps) {
         <VersionHistory versions={versions} currentDocumentId={id} />
       ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
-        <div className="space-y-4">
+      <div className="max-w-sm space-y-4">
           <Card className="gap-3 py-4">
             <CardHeader className="gap-1 px-4 pb-0">
               <CardTitle className="text-lg">Document details</CardTitle>
@@ -138,6 +143,13 @@ export default async function CoiDetailPage({ params }: CoiDetailPageProps) {
                   Open in Cloudinary
                 </a>
               </Button>
+              <CoiDeleteButton
+                documentId={id}
+                fileName={document.fileName}
+                redirectTo="/dashboard"
+                variant="destructive"
+                size="sm"
+              />
             </CardContent>
           </Card>
 
@@ -147,36 +159,42 @@ export default async function CoiDetailPage({ params }: CoiDetailPageProps) {
               currentStatus={document.version.status}
             />
           ) : null}
-        </div>
+      </div>
 
+      {isPdf ? (
         <Card className="gap-3 overflow-hidden py-4">
           <CardHeader className="gap-1 px-4 pb-0">
             <CardTitle className="text-lg">Document preview</CardTitle>
-            <CardDescription className="text-sm">
-              {isPdf ? "PDF preview" : "Image preview"}
-            </CardDescription>
           </CardHeader>
           <CardContent className="px-4 pb-4">
-            {isPdf ? (
-              <iframe
-                src={document.cloudinaryUrl}
-                title={document.fileName}
-                className="h-[70vh] w-full rounded-lg border bg-muted"
-              />
-            ) : (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={document.cloudinaryUrl}
-                alt={document.fileName}
-                className="max-h-[70vh] w-full rounded-lg border object-contain bg-muted"
-              />
-            )}
+            <CoiPdfViewer
+              pdfUrl={`/api/coi/${id}/pdf`}
+              fileName={document.fileName}
+            />
           </CardContent>
         </Card>
-      </div>
+      ) : (
+        <Card className="gap-3 overflow-hidden py-4">
+          <CardHeader className="gap-1 px-4 pb-0">
+            <CardTitle className="text-lg">Document preview</CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 pb-4">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={document.cloudinaryUrl}
+              alt={document.fileName}
+              className="max-h-[70vh] w-full rounded-lg border object-contain bg-muted"
+            />
+          </CardContent>
+        </Card>
+      )}
 
       {document.senderEmail ? (
         <ResubmitForm documentId={id} senderEmail={document.senderEmail} />
+      ) : null}
+
+      {document.version && pipelineStatus ? (
+        <CoiPipelinePanel documentId={id} initialStatus={pipelineStatus} />
       ) : null}
     </div>
   );
