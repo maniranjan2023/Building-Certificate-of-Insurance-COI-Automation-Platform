@@ -18,7 +18,9 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/favicon");
 
   if (isPublic) {
-    return NextResponse.next();
+    const response = NextResponse.next();
+    response.headers.set("x-pathname", pathname);
+    return response;
   }
 
   const token = request.cookies.get(AUTH_COOKIE_NAME)?.value;
@@ -40,7 +42,9 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
-  return NextResponse.next();
+  const response = NextResponse.next();
+  response.headers.set("x-pathname", pathname);
+  return response;
 }
 
 export const config = {

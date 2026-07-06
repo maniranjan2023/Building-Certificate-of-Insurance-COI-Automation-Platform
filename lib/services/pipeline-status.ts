@@ -194,7 +194,12 @@ export async function getPipelineStatusForDocument(
     aiRunStatus: aiRun?.status ?? null,
     currentStepLabel: aiRun?.currentStepLabel ?? null,
     exitReason: aiRun?.exitReason ?? null,
-    suggestedTemplate: aiRun?.suggestedTemplate ?? version?.aiSuggestedTemplate ?? null,
+    suggestedTemplate:
+      aiRun?.status === AiRunStatus.STOPPED_EARLY
+        ? aiRun.suggestedTemplate ??
+          version?.aiSuggestedTemplate ??
+          "guardrail_blocked"
+        : aiRun?.suggestedTemplate ?? version?.aiSuggestedTemplate ?? null,
     stages: buildStages({
       job,
       aiRunStatus: aiRun?.status ?? null,

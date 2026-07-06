@@ -252,6 +252,14 @@ function evaluateItem(
     if (!expiration) {
       return { status: "MISSING", evidence: "Policy expiration date not found." };
     }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (expiration < today) {
+      return {
+        status: "FAIL",
+        evidence: `Policy expired on ${expirationLabel ?? formatUsDate(expiration)}. Submit a renewed COI with a valid future expiration date.`,
+      };
+    }
     if (effective) {
       const days = daysBetween(effective, expiration);
       if (days < MIN_POLICY_DAYS) {
@@ -452,8 +460,26 @@ export function buildReportFromChecklist(
       quote: i.evidence ?? "See COI document",
     })),
     suggestedEmailBody: hasMandatory
-      ? `Your certificate of insurance (${extraction.policyNumber ?? "attached"}) does not meet our requirements. Please update and resubmit. Issues: ${checklistResult.mandatoryFailures.join("; ")}.`
-      : "Please review the attached COI feedback and resubmit if updates are needed.",
+      ? `Hello {{sender_name}},
+
+We reviewed your Certificate of Insurance ({{version_number}}) and found issues that must be corrected before we can accept it:
+
+{{missing_items}}
+
+Please ask your insurance agent to issue an updated COI addressing the items above and reply with the corrected document.
+
+Thank you,
+{{signatory_name}}
+{{signatory_title}}
+{{company_name}}`
+      : `Hello {{sender_name}},
+
+Please review the attached COI feedback and resubmit if updates are needed.
+
+Thank you,
+{{signatory_name}}
+{{signatory_title}}
+{{company_name}}`,
     confidenceScore: hasMandatory ? 0.9 : 0.85,
   };
 }

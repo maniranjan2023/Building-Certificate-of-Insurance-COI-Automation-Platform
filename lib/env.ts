@@ -69,6 +69,12 @@ const envSchema = z.object({
   LOGFIRE_CONSOLE: z
     .enum(["true", "false"])
     .default("false"),
+
+  /** Outbound email signature (Phase 5) */
+  EMAIL_SIGNATORY_NAME: z.string().default("Compliance Team"),
+  EMAIL_SIGNATORY_TITLE: z.string().default("Property Manager"),
+  EMAIL_COMPANY_NAME: z.string().default("Oakwood Property Management LLC"),
+  EMAIL_PROPERTY_NAME: z.string().default("Oakwood Property Management LLC"),
 });
 
 

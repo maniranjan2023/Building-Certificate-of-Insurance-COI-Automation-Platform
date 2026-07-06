@@ -187,11 +187,14 @@ export async function listCoiDocuments(): Promise<CoiDocument[]> {
 }
 
 export async function listCoiSubmissions(): Promise<CoiSubmissionRow[]> {
-  const versions = await listAllVersionsWithLatestJob();
-  return versions.map((version) => ({
-    ...version,
-    latestJob: version.jobs[0] ?? null,
-  }));
+  const { withDbRetry } = await import("@/lib/utils/db-retry");
+  return withDbRetry(async () => {
+    const versions = await listAllVersionsWithLatestJob();
+    return versions.map((version) => ({
+      ...version,
+      latestJob: version.jobs[0] ?? null,
+    }));
+  }, { label: "list COI submissions" });
 }
 
 /** @deprecated Use listCoiSubmissions — kept for compatibility */
@@ -269,30 +272,33 @@ export async function deleteCoiDocumentById(id: string): Promise<void> {
 }
 
 export async function getCoiDocumentByIdWithLatestJob(id: string) {
-  const version = await getVersionByDocumentId(id);
-  if (!version) {
-    const document = await getCoiDocumentById(id);
-    if (!document) {
-      return null;
+  const { withDbRetry } = await import("@/lib/utils/db-retry");
+  return withDbRetry(async () => {
+    const version = await getVersionByDocumentId(id);
+    if (!version) {
+      const document = await getCoiDocumentById(id);
+      if (!document) {
+        return null;
+      }
+      return {
+        ...document,
+        version: null,
+        sender: null,
+        latestJob: null as CoiJob | null,
+        status: null,
+        senderEmail: null,
+      };
     }
-    return {
-      ...document,
-      version: null,
-      sender: null,
-      latestJob: null as CoiJob | null,
-      status: null,
-      senderEmail: null,
-    };
-  }
 
-  return {
-    ...version.coiDocument,
-    version,
-    sender: version.sender,
-    latestJob: version.jobs[0] ?? null,
-    status: version.status,
-    senderEmail: version.sender.email,
-  };
+    return {
+      ...version.coiDocument,
+      version,
+      sender: version.sender,
+      latestJob: version.jobs[0] ?? null,
+      status: version.status,
+      senderEmail: version.sender.email,
+    };
+  }, { label: "get COI document with latest job" });
 }
 
 export { COI_STATUS_LABELS } from "@/lib/services/version-labels";

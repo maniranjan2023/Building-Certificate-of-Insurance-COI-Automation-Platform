@@ -1,104 +1,23 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
+import { AgentOutputDialog } from "@/components/coi/agent-output-dialog";
+import { buildPipelineTimelineItems } from "@/components/coi/pipeline-timeline-utils";
 import { AiResultsPanel } from "@/components/coi/ai-results-panel";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Timeline } from "@/components/ui/timeline";
 import { formatStepLabel } from "@/lib/constants/pipeline-stages";
 import { JOB_STATUS_LABELS } from "@/lib/constants/job-status";
 import type { AiRunWithSteps } from "@/lib/services/ai-run";
 import type {
   AgentStepView,
-  PipelineStageView,
   PipelineStatusResponse,
 } from "@/lib/services/pipeline-status";
-import { cn } from "@/lib/utils";
 
 interface CoiPipelinePanelProps {
   documentId: string;
   initialStatus: PipelineStatusResponse;
-}
-
-function stageBadgeClass(status: PipelineStageView["status"]): string {
-  switch (status) {
-    case "running":
-      return "border-sky-500/40 bg-sky-500/10 text-sky-400";
-    case "completed":
-      return "border-emerald-500/40 bg-emerald-500/10 text-emerald-400";
-    case "failed":
-      return "border-red-500/40 bg-red-500/10 text-red-400";
-    case "skipped":
-      return "border-amber-500/40 bg-amber-500/10 text-amber-400";
-    default:
-      return "border-muted bg-muted/30 text-muted-foreground";
-  }
-}
-
-function formatJson(value: unknown): string {
-  if (value == null) return "—";
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return String(value);
-  }
-}
-
-function AgentStepCard({ step }: { step: AgentStepView }) {
-  const title = step.agentName ?? step.kind;
-  const failed = step.guardrailPassed === false || Boolean(step.tripwireReason);
-
-  return (
-    <details className="rounded-lg border bg-card">
-      <summary className="cursor-pointer list-none px-4 py-3 [&::-webkit-details-marker]:hidden">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <span className="font-medium">{title}</span>
-            {step.modelUsed ? (
-              <span className="text-xs text-muted-foreground">{step.modelUsed}</span>
-            ) : null}
-          </div>
-          <div className="flex items-center gap-2 text-xs">
-            {failed ? (
-              <Badge variant="outline" className="border-red-500/40 text-red-400">
-                Failed
-              </Badge>
-            ) : step.output != null ? (
-              <Badge variant="outline" className="border-emerald-500/40 text-emerald-400">
-                Completed
-              </Badge>
-            ) : (
-              <Badge variant="outline">Logged</Badge>
-            )}
-            {step.durationMs != null ? (
-              <span className="text-muted-foreground">{step.durationMs}ms</span>
-            ) : null}
-          </div>
-        </div>
-        {step.tripwireReason ? (
-          <p className="mt-1 text-sm text-red-400">{step.tripwireReason}</p>
-        ) : null}
-      </summary>
-      <div className="space-y-3 border-t px-4 py-3 text-sm">
-        {step.input != null ? (
-          <div>
-            <p className="mb-1 font-medium text-muted-foreground">Input</p>
-            <pre className="max-h-48 overflow-auto rounded-md bg-muted/50 p-3 text-xs">
-              {formatJson(step.input)}
-            </pre>
-          </div>
-        ) : null}
-        {step.output != null ? (
-          <div>
-            <p className="mb-1 font-medium text-muted-foreground">Output</p>
-            <pre className="max-h-80 overflow-auto rounded-md bg-muted/50 p-3 text-xs">
-              {formatJson(step.output)}
-            </pre>
-          </div>
-        ) : null}
-      </div>
-    </details>
-  );
 }
 
 export function CoiPipelinePanel({
@@ -107,6 +26,9 @@ export function CoiPipelinePanel({
 }: CoiPipelinePanelProps) {
   const [status, setStatus] = useState(initialStatus);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [selectedStep, setSelectedStep] = useState<AgentStepView | null>(null);
+  const [selectedStageLabel, setSelectedStageLabel] = useState("");
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -134,6 +56,25 @@ export function CoiPipelinePanel({
     }, 2000);
     return () => clearInterval(interval);
   }, [status.isActive, fetchStatus]);
+
+  const handleSelectStep = useCallback(
+    (step: AgentStepView | null, stageLabel: string) => {
+      setSelectedStep(step);
+      setSelectedStageLabel(stageLabel);
+      setDialogOpen(true);
+    },
+    []
+  );
+
+  const timelineItems = useMemo(
+    () =>
+      buildPipelineTimelineItems({
+        stages: status.stages,
+        steps: status.steps,
+        onSelectStep: handleSelectStep,
+      }),
+    [status.stages, status.steps, handleSelectStep]
+  );
 
   const syntheticAiRun: AiRunWithSteps | null =
     status.steps.length > 0 || status.aiRunStatus
@@ -165,25 +106,28 @@ export function CoiPipelinePanel({
       : null;
 
   return (
-    <div className="space-y-4">
-      <Card className="gap-3 py-4">
-        <CardHeader className="gap-1 px-4 pb-0">
-          <div className="flex items-center justify-between gap-2">
-            <div>
-              <CardTitle className="text-lg">Processing pipeline</CardTitle>
-              <CardDescription className="text-sm">
-                Live status of your PDF through the worker and AI agents
-              </CardDescription>
+    <div className="min-w-0 space-y-4">
+      <section className="relative overflow-hidden rounded-2xl border bg-card shadow-sm">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_100%_0%,oklch(0.62_0.19_255/0.08),transparent_60%)]"
+        />
+        <div className="relative space-y-4 p-5 md:p-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <h2 className="text-lg font-semibold tracking-tight">AI processing pipeline</h2>
+              <p className="mt-1 max-w-xl text-sm text-muted-foreground">
+                Live worker and agent steps. Click a completed step to inspect input and JSON output.
+              </p>
             </div>
             {status.isActive ? (
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <div className="flex shrink-0 items-center gap-2 rounded-full border bg-background/80 px-3 py-1.5 text-xs text-muted-foreground">
                 {isRefreshing ? <Loader2 className="size-3.5 animate-spin" /> : null}
                 Live · updates every 2s
               </div>
             ) : null}
           </div>
-        </CardHeader>
-        <CardContent className="space-y-4 px-4 pb-4">
+
           <div className="flex flex-wrap gap-2 text-sm">
             {status.jobStatus ? (
               <Badge variant="outline">
@@ -201,56 +145,50 @@ export function CoiPipelinePanel({
           </div>
 
           {status.failureReason ? (
-            <p className="text-sm text-red-400">{status.failureReason}</p>
-          ) : null}
-
-          <ol className="space-y-2">
-            {status.stages.map((stage) => (
-              <li
-                key={stage.id}
-                className={cn(
-                  "flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-sm",
-                  stageBadgeClass(stage.status)
-                )}
-              >
-                <span>{stage.label}</span>
-                <span className="text-xs uppercase tracking-wide">{stage.status}</span>
-              </li>
-            ))}
-          </ol>
-        </CardContent>
-      </Card>
-
-      <Card className="gap-3 py-4">
-        <CardHeader className="gap-1 px-4 pb-0">
-          <CardTitle className="text-lg">Agent outputs</CardTitle>
-          <CardDescription className="text-sm">
-            Expand each step to see the raw input and JSON output from that agent
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-2 px-4 pb-4">
-          {status.isActive && status.steps.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Waiting for worker to start… current stage:{" "}
-              {formatStepLabel(status.currentStepLabel ?? "worker")}
+            <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400">
+              {status.failureReason}
             </p>
           ) : null}
-          {status.steps.length === 0 && !status.isActive ? (
-            <p className="text-sm text-muted-foreground">
-              No agent steps recorded yet. Upload a COI and ensure the worker is running.
-            </p>
-          ) : null}
-          {status.steps.map((step) => (
-            <AgentStepCard key={step.id} step={step} />
-          ))}
-          {status.isActive ? (
-            <div className="flex items-center gap-2 rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin text-sky-400" />
-              {formatStepLabel(status.currentStepLabel ?? "processing")}…
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
+
+          <div className="min-w-0 rounded-xl border bg-muted/20 p-4">
+            {status.isActive && status.steps.length === 0 ? (
+              <p className="mb-3 text-sm text-muted-foreground">
+                Waiting for worker to start… current stage:{" "}
+                {formatStepLabel(status.currentStepLabel ?? "worker")}
+              </p>
+            ) : null}
+            {status.steps.length === 0 && !status.isActive ? (
+              <p className="mb-3 text-sm text-muted-foreground">
+                No pipeline activity yet. Upload a COI and ensure the worker is running.
+              </p>
+            ) : null}
+
+            <Timeline
+              items={timelineItems}
+              orientation="horizontal"
+              variant="compact"
+            />
+
+            {status.isActive ? (
+              <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="size-4 animate-spin text-sky-400" />
+                {formatStepLabel(status.currentStepLabel ?? "processing")}…
+              </div>
+            ) : null}
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            Completed steps with agent data open a detail dialog. Scroll the timeline horizontally if needed.
+          </p>
+        </div>
+      </section>
+
+      <AgentOutputDialog
+        step={selectedStep}
+        stageLabel={selectedStageLabel}
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+      />
 
       <AiResultsPanel
         version={status.version ?? {}}

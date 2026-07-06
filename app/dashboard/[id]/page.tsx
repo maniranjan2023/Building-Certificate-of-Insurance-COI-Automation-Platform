@@ -1,201 +1,133 @@
-import Link from "next/link";
-import { CoiPdfViewer } from "@/components/coi/coi-pdf-viewer-dynamic";
-import { CoiPipelinePanel } from "@/components/coi/coi-pipeline-panel";
-import { getPipelineStatusForDocument } from "@/lib/services/pipeline-status";
-import { notFound } from "next/navigation";
-import { ArrowLeft, ExternalLink } from "lucide-react";
-import { getCoiDocumentByIdWithLatestJob } from "@/lib/services/coi";
-import { listVersionsForDocument } from "@/lib/services/version";
-import { JOB_STATUS_LABELS } from "@/lib/constants/job-status";
-import { COI_STATUS_LABELS } from "@/lib/services/version-labels";
-import { INTAKE_SOURCE_DESCRIPTIONS } from "@/lib/constants/intake-source";
-import { formatBytes, formatDate } from "@/lib/utils";
-import { IntakeSourceBadge } from "@/components/ui/intake-source-badge";
-import { StatusBadge } from "@/components/ui/status-badge";
-import { JobStatusBadge } from "@/components/ui/job-status-badge";
-import { VersionBadge } from "@/components/ui/version-badge";
-import { VersionHistory } from "@/components/coi/version-history";
-import { VersionActions } from "@/components/coi/version-actions";
-import { CoiDeleteButton } from "@/components/coi/coi-delete-button";
-import { ResubmitForm } from "@/components/coi/resubmit-form";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-
-interface CoiDetailPageProps {
-  params: Promise<{ id: string }>;
-}
-
-export default async function CoiDetailPage({ params }: CoiDetailPageProps) {
-  const { id } = await params;
-  const document = await getCoiDocumentByIdWithLatestJob(id);
-
-  if (!document) {
-    notFound();
-  }
-
-  const versions = document.version
-    ? await listVersionsForDocument(id)
-    : [];
-
-  const pipelineStatus = await getPipelineStatusForDocument(id);
-
-  const isPdf = document.mimeType === "application/pdf";
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <Button asChild variant="ghost" size="sm" className="mb-1 h-8 px-0 text-sm">
-            <Link href="/dashboard">
-              <ArrowLeft className="size-3" />
-              Back to dashboard
-            </Link>
-          </Button>
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight">
-              {document.fileName}
-            </h1>
-            {document.version ? (
-              <VersionBadge versionNumber={document.version.versionNumber} />
-            ) : null}
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Uploaded {formatDate(document.createdAt)}
-            {document.senderEmail ? ` · ${document.senderEmail}` : ""}
-          </p>
-        </div>
-        <div className="flex flex-col items-end gap-2">
-          <IntakeSourceBadge source={document.intakeSource} />
-          {document.latestJob ? (
-            <JobStatusBadge
-              status={document.latestJob.status}
-              label={JOB_STATUS_LABELS[document.latestJob.status]}
-            />
-          ) : null}
-          {document.status ? (
-            <StatusBadge
-              status={document.status}
-              label={COI_STATUS_LABELS[document.status]}
-            />
-          ) : null}
-        </div>
-      </div>
-
-      {document.version ? (
-        <VersionHistory versions={versions} currentDocumentId={id} />
-      ) : null}
-
-      <div className="max-w-sm space-y-4">
-          <Card className="gap-3 py-4">
-            <CardHeader className="gap-1 px-4 pb-0">
-              <CardTitle className="text-lg">Document details</CardTitle>
-              <CardDescription className="text-sm">Stored immutably in Cloudinary</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3 px-4 pb-4 text-sm">
-              <div>
-                <p className="text-muted-foreground">Intake source</p>
-                <div className="mt-1">
-                  <IntakeSourceBadge source={document.intakeSource} />
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {INTAKE_SOURCE_DESCRIPTIONS[document.intakeSource]}
-                </p>
-              </div>
-              {document.senderEmail ? (
-                <div>
-                  <p className="text-muted-foreground">Tenant email</p>
-                  <p className="font-medium">{document.senderEmail}</p>
-                </div>
-              ) : null}
-              {document.version ? (
-                <div>
-                  <p className="text-muted-foreground">Version</p>
-                  <VersionBadge versionNumber={document.version.versionNumber} />
-                </div>
-              ) : null}
-              {document.version?.rejectionReason ? (
-                <div>
-                  <p className="text-muted-foreground">Rejection reason</p>
-                  <p className="font-medium text-red-400">
-                    {document.version.rejectionReason}
-                  </p>
-                </div>
-              ) : null}
-              <div>
-                <p className="text-muted-foreground">File name</p>
-                <p className="font-medium">{document.fileName}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">MIME type</p>
-                <p className="font-medium">{document.mimeType}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">File size</p>
-                <p className="font-medium">{formatBytes(document.fileSizeBytes)}</p>
-              </div>
-              <Button asChild size="sm" className="w-full">
-                <a
-                  href={document.cloudinaryUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <ExternalLink className="size-3.5" />
-                  Open in Cloudinary
-                </a>
-              </Button>
-              <CoiDeleteButton
-                documentId={id}
-                fileName={document.fileName}
-                redirectTo="/dashboard"
-                variant="destructive"
-                size="sm"
-              />
-            </CardContent>
-          </Card>
-
-          {document.version ? (
-            <VersionActions
-              versionId={document.version.id}
-              currentStatus={document.version.status}
-            />
-          ) : null}
-      </div>
-
-      {isPdf ? (
-        <Card className="gap-3 overflow-hidden py-4">
-          <CardHeader className="gap-1 px-4 pb-0">
-            <CardTitle className="text-lg">Document preview</CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-4">
-            <CoiPdfViewer
-              pdfUrl={`/api/coi/${id}/pdf`}
-              fileName={document.fileName}
-            />
-          </CardContent>
-        </Card>
-      ) : (
-        <Card className="gap-3 overflow-hidden py-4">
-          <CardHeader className="gap-1 px-4 pb-0">
-            <CardTitle className="text-lg">Document preview</CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-4">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={document.cloudinaryUrl}
-              alt={document.fileName}
-              className="max-h-[70vh] w-full rounded-lg border object-contain bg-muted"
-            />
-          </CardContent>
-        </Card>
-      )}
-
-      {document.senderEmail ? (
-        <ResubmitForm documentId={id} senderEmail={document.senderEmail} />
-      ) : null}
-
-      {document.version && pipelineStatus ? (
-        <CoiPipelinePanel documentId={id} initialStatus={pipelineStatus} />
-      ) : null}
-    </div>
-  );
-}
+import Link from "next/link";
+import { CoiPdfViewer } from "@/components/coi/coi-pdf-viewer-dynamic";
+import { CoiPipelinePanel } from "@/components/coi/coi-pipeline-panel";
+import { CoiDetailHeader } from "@/components/coi/coi-detail-header";
+import { getPipelineStatusForDocument } from "@/lib/services/pipeline-status";
+import { notFound } from "next/navigation";
+import { getCoiDocumentByIdWithLatestJob } from "@/lib/services/coi";
+import { listVersionsForDocument } from "@/lib/services/version";
+import { VersionHistory } from "@/components/coi/version-history";
+import { ReviewActionsPanel } from "@/components/coi/review-actions-panel";
+import { ResubmitForm } from "@/components/coi/resubmit-form";
+import { DocumentActivityPanel } from "@/components/tenants/document-activity-panel";
+import { resolveSenderIdForDocument } from "@/lib/services/tenant-activity";
+import { FileImage } from "lucide-react";
+import type { ReportAgentOutput } from "@/lib/ai/schemas";
+import { JobStatus } from "@prisma/client";
+
+interface CoiDetailPageProps {
+  params: Promise<{ id: string }>;
+}
+
+export default async function CoiDetailPage({ params }: CoiDetailPageProps) {
+  const { id } = await params;
+  const document = await getCoiDocumentByIdWithLatestJob(id);
+
+  if (!document) {
+    notFound();
+  }
+
+  const versions = document.version
+    ? await listVersionsForDocument(id)
+    : [];
+
+  const pipelineStatus = await getPipelineStatusForDocument(id);
+  const senderRef = await resolveSenderIdForDocument(id);
+
+  const isPdf = document.mimeType === "application/pdf";
+  const jobReady = document.latestJob?.status === JobStatus.READY_FOR_REVIEW;
+  const draftReport = document.version
+    ? asReport(document.version.draftReport)
+    : null;
+
+  return (
+    <div className="min-w-0 space-y-6">
+      <CoiDetailHeader
+        documentId={id}
+        fileName={document.fileName}
+        createdAt={document.createdAt}
+        fileSizeBytes={document.fileSizeBytes}
+        mimeType={document.mimeType}
+        intakeSource={document.intakeSource}
+        cloudinaryUrl={document.cloudinaryUrl}
+        senderEmail={document.senderEmail}
+        senderId={senderRef?.senderId ?? null}
+        versionNumber={document.version?.versionNumber ?? null}
+        coiStatus={document.status}
+        jobStatus={document.latestJob?.status ?? null}
+        rejectionReason={document.version?.rejectionReason ?? null}
+      />
+
+      {document.version ? (
+        <VersionHistory versions={versions} currentDocumentId={id} />
+      ) : null}
+
+      <div className="grid min-w-0 gap-6 xl:grid-cols-12">
+        <div className="min-w-0 space-y-4 xl:col-span-5 xl:sticky xl:top-20 xl:self-start">
+          <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+            <div className="border-b px-4 py-3 md:px-5">
+              <h2 className="font-semibold tracking-tight">Document preview</h2>
+              <p className="text-xs text-muted-foreground">
+                Scroll inside the viewer — page layout stays fixed
+              </p>
+            </div>
+            <div className="min-w-0 p-4 md:p-5">
+              {isPdf ? (
+                <CoiPdfViewer
+                  pdfUrl={`/api/coi/${id}/pdf`}
+                  fileName={document.fileName}
+                />
+              ) : (
+                <div className="overflow-hidden rounded-xl border bg-muted/30">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={document.cloudinaryUrl}
+                    alt={document.fileName}
+                    className="max-h-[70vh] w-full object-contain"
+                  />
+                </div>
+              )}
+            </div>
+          </section>
+
+          {document.senderEmail ? (
+            <ResubmitForm documentId={id} senderEmail={document.senderEmail} />
+          ) : null}
+        </div>
+
+        <div className="min-w-0 space-y-4 xl:col-span-7">
+          {document.version && pipelineStatus ? (
+            <CoiPipelinePanel documentId={id} initialStatus={pipelineStatus} />
+          ) : (
+            <section className="rounded-2xl border border-dashed bg-card/50 px-6 py-10 text-center">
+              <FileImage className="mx-auto size-8 text-muted-foreground" />
+              <p className="mt-3 text-sm font-medium">No version linked yet</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Processing metadata will appear once the submission is versioned.
+              </p>
+            </section>
+          )}
+
+          {document.version ? <DocumentActivityPanel coiDocumentId={id} /> : null}
+
+          {document.version ? (
+            <ReviewActionsPanel
+              documentId={id}
+              versionId={document.version.id}
+              currentStatus={document.version.status}
+              initialDraft={draftReport}
+              suggestedTemplate={document.version.aiSuggestedTemplate}
+              recipientEmail={document.senderEmail ?? document.version.sender?.email ?? null}
+              jobReady={jobReady}
+            />
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function asReport(value: unknown): ReportAgentOutput | null {
+  if (!value || typeof value !== "object") return null;
+  return value as ReportAgentOutput;
+}

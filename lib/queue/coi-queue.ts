@@ -4,6 +4,7 @@ import { getQueueConnection } from "@/lib/queue/connection";
 import { getDefaultJobOptions, getEnqueueJobOptions } from "@/lib/queue/job-options";
 
 export const PROCESS_COI_JOB_NAME = "process-coi";
+export const SEND_TEMPLATE_EMAIL_JOB_NAME = "send-template-email";
 
 export interface ProcessCoiJobData {
   coiJobId: string;
@@ -20,28 +21,43 @@ export interface ProcessCoiJobData {
   failedAt?: string;
 }
 
+export interface SendTemplateEmailJobData {
+  coiJobId: string;
+  coiVersionId: string;
+  coiDocumentId: string;
+  templateKey: string;
+  toEmail: string;
+  customBody?: string;
+  customSubject?: string;
+  rejectionReason?: string;
+  agentMailMessageId?: string | null;
+  agentMailInboxId?: string | null;
+}
+
+export type CoiQueueJobData = ProcessCoiJobData | SendTemplateEmailJobData;
+
 let coiQueue: Queue | null = null;
 let coiDlqQueue: Queue | null = null;
 
-export function getCoiQueue(): Queue<ProcessCoiJobData> {
+export function getCoiQueue(): Queue<CoiQueueJobData> {
   if (!coiQueue) {
     const env = getEnv();
-    coiQueue = new Queue<ProcessCoiJobData>(env.BULLMQ_COI_QUEUE, {
+    coiQueue = new Queue<CoiQueueJobData>(env.BULLMQ_COI_QUEUE, {
       connection: getQueueConnection(),
       defaultJobOptions: getDefaultJobOptions(),
-    }) as Queue<ProcessCoiJobData>;
+    }) as Queue<CoiQueueJobData>;
   }
-  return coiQueue as Queue<ProcessCoiJobData>;
+  return coiQueue as Queue<CoiQueueJobData>;
 }
 
-export function getCoiDlqQueue(): Queue<ProcessCoiJobData> {
+export function getCoiDlqQueue(): Queue<CoiQueueJobData> {
   if (!coiDlqQueue) {
     const env = getEnv();
-    coiDlqQueue = new Queue<ProcessCoiJobData>(env.BULLMQ_COI_DLQ, {
+    coiDlqQueue = new Queue<CoiQueueJobData>(env.BULLMQ_COI_DLQ, {
       connection: getQueueConnection(),
-    }) as Queue<ProcessCoiJobData>;
+    }) as Queue<CoiQueueJobData>;
   }
-  return coiDlqQueue as Queue<ProcessCoiJobData>;
+  return coiDlqQueue as Queue<CoiQueueJobData>;
 }
 
 export interface EnqueueProcessCoiOptions {
@@ -87,6 +103,19 @@ export async function enqueueProcessCoiJob(
     );
   }
 
+  return job.id ?? coiJobId;
+}
+
+export async function enqueueSendTemplateEmailJob(
+  coiJobId: string,
+  data: Omit<SendTemplateEmailJobData, "coiJobId">
+): Promise<string> {
+  const queue = getCoiQueue();
+  const job = await queue.add(
+    SEND_TEMPLATE_EMAIL_JOB_NAME,
+    { coiJobId, ...data },
+    getEnqueueJobOptions(coiJobId)
+  );
   return job.id ?? coiJobId;
 }
 
