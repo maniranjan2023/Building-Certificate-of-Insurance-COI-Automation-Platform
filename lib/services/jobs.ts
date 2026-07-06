@@ -1,6 +1,6 @@
 import { JobStatus, JobType, type CoiJob, type Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { enqueueProcessCoiJob } from "@/lib/queue/coi-queue";
+import { enqueueProcessCoiJob, type EnqueueProcessCoiOptions } from "@/lib/queue/coi-queue";
 import { getEnv } from "@/lib/env";
 
 export { JOB_STATUS_LABELS } from "@/lib/constants/job-status";
@@ -14,7 +14,8 @@ export type CoiJobWithRelations = Prisma.CoiJobGetPayload<{
 
 export async function createProcessCoiJob(
   coiVersionId: string,
-  coiDocumentId: string
+  coiDocumentId: string,
+  options?: EnqueueProcessCoiOptions
 ): Promise<CoiJob> {
   const env = getEnv();
   const job = await prisma.coiJob.create({
@@ -30,7 +31,8 @@ export async function createProcessCoiJob(
   const bullmqJobId = await enqueueProcessCoiJob(
     job.id,
     coiDocumentId,
-    coiVersionId
+    coiVersionId,
+    options
   );
 
   return prisma.coiJob.update({
@@ -88,6 +90,10 @@ export async function retryJobFromDlq(coiJobId: string): Promise<CoiJob> {
 
   if (existing.status !== JobStatus.DLQ) {
     throw new Error("Only DLQ jobs can be retried.");
+  }
+
+  if (!existing.coiVersionId) {
+    throw new Error("Job is missing coiVersionId.");
   }
 
   const bullmqJobId = `${existing.id}-retry-${Date.now()}`;

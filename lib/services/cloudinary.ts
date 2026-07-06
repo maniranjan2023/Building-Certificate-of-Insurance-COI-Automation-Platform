@@ -110,3 +110,8 @@ export async function uploadCoiBuffer(
     bytes: result.bytes,
   };
 }
+
+export async function deleteCloudinaryAsset(publicId: string): Promise<void> {
+  configureCloudinary();
+  await cloudinary.uploader.destroy(publicId, { resource_type: "auto" });
+}

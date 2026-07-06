@@ -35,6 +35,21 @@ enum JobType {
   SEND_REMINDER
 }
 
+enum AiRunStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+  STOPPED_EARLY
+}
+
+enum AgentStepKind {
+  LLAMAPARSE
+  GUARDRAIL_INPUT
+  AGENT
+  GUARDRAIL_OUTPUT
+  VALIDATION
+}
+
 model Sender {
   id          String       @id @default(cuid())
   email       String       @unique
@@ -74,7 +89,16 @@ model CoiVersion {
   status          CoiStatus   @default(PENDING_REVIEW)
   rejectionReason String?
   notes           String?
+  rawOcrText      String?     @db.Text
+  extractedFields Json?
+  checklistResults Json?
+  riskAnalysis    Json?
+  draftReport     Json?
+  aiSuggestedTemplate String?
+  /** Mandatory/optional field locations from LlamaParse layout (for PDF overlay). */
+  fieldBoundingBoxes Json?
   jobs            CoiJob[]
+  aiRuns          AiRun[]
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
@@ -99,6 +123,7 @@ model CoiJob {
   dlqJobId      String?
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
+  aiRun         AiRun?
 
   @@index([status])
   @@index([coiVersionId])
@@ -119,6 +144,42 @@ model ChecklistItem {
 
   @@index([category])
   @@index([enabled, sortOrder])
+}
+
+model AiRun {
+  id                  String      @id @default(cuid())
+  coiJobId            String      @unique
+  coiJob              CoiJob      @relation(fields: [coiJobId], references: [id], onDelete: Cascade)
+  coiVersionId        String
+  coiVersion          CoiVersion  @relation(fields: [coiVersionId], references: [id], onDelete: Cascade)
+  status              AiRunStatus @default(RUNNING)
+  exitReason          String?
+  suggestedTemplate   String?
+  currentStepLabel    String?
+  startedAt           DateTime    @default(now())
+  completedAt         DateTime?
+  steps               AgentStep[]
+
+  @@index([coiVersionId])
+  @@index([status])
+}
+
+model AgentStep {
+  id              String        @id @default(cuid())
+  aiRunId         String
+  aiRun           AiRun         @relation(fields: [aiRunId], references: [id], onDelete: Cascade)
+  stepOrder       Int
+  kind            AgentStepKind
+  agentName       String?
+  modelUsed       String?
+  input           Json?
+  output          Json?
+  guardrailPassed Boolean?
+  tripwireReason  String?
+  durationMs      Int?
+  createdAt       DateTime      @default(now())
+
+  @@index([aiRunId, stepOrder])
 }
 
 model ProcessedWebhookEvent {
