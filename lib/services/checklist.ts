@@ -90,6 +90,8 @@ export async function ensureDefaultChecklistItems(): Promise<number> {
 }
 
 export async function listChecklistItems(includeDisabled = false) {
+  await ensureDefaultChecklistItems();
+
   return prisma.checklistItem.findMany({
     where: includeDisabled ? undefined : { enabled: true },
     orderBy: [{ category: "asc" }, { sortOrder: "asc" }],

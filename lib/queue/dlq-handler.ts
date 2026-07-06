@@ -6,6 +6,7 @@ import {
   type ProcessCoiJobData,
 } from "@/lib/queue/coi-queue";
 import { updateCoiJobStatus } from "@/lib/services/jobs";
+import { notifyProcessingErrorForJob } from "@/lib/workers/process-coi";
 
 function getMaxAttempts(job: Job<ProcessCoiJobData>, fallback: number): number {
   const attempts = job.opts.attempts ?? fallback;
@@ -63,4 +64,6 @@ export async function handleExhaustedJobFailure(
     failureReason: error.message,
     dlqJobId: dlqJob.id ?? dlqJobId,
   });
+
+  await notifyProcessingErrorForJob(job.data);
 }
