@@ -771,6 +771,13 @@ npm install node-cron    # Phase 6
 
 ## Architecture Overview
 
+![COI Platform System Architecture](docs/diagram-export-7-7-2026-12_56_40-PM.png)
+
+*Full system architecture — intake (AgentMail + dashboard), Next.js app, Neon/Cloudinary/Redis, BullMQ worker, 5-agent AI pipeline (Groq + LlamaParse), admin review loop, and outbound email.*
+
+<details>
+<summary>ASCII diagram (legacy reference)</summary>
+
 ```
                     ┌──────────────────────────────────────────────┐
                     │              Next.js (full-stack)             │
@@ -809,6 +816,8 @@ npm install node-cron    # Phase 6
                     │  reminder-jobs (not coi-jobs)    │
                     └──────────────────────────────────┘
 ```
+
+</details>
 
 ### Design Principles
 
