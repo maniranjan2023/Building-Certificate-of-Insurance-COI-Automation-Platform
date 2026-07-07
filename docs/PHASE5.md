@@ -2,6 +2,12 @@
 
 Phase 5 closes the COI loop: admins edit AI draft reports (including citations), outbound emails pass a final guardrail, templated tenant notifications go out via AgentMail, and accept/reject only when checklist and expiration rules pass.
 
+## System architecture
+
+![COI Platform System Architecture — Phase 5](diagram-export-7-7-2026-12_56_40-PM.png)
+
+The diagram covers the full Phase 5 stack: **AgentMail** intake and outbound email, **Next.js 15** admin UI and REST API, **Neon Postgres** + **Cloudinary**, **Upstash Redis** / **BullMQ** (`coi-jobs`, `coi-jobs-dlq`), the **process-coi** worker with **LlamaParse OCR** and **5 Groq agents** + guardrails, and the admin **Accept / Reject / Send** review loop with templated replies and `OutboundEmail` audit.
+
 ## Prerequisites
 
 - Phase 4 complete (AI pipeline, draft report on `CoiVersion`)
