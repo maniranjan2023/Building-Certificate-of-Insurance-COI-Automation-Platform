@@ -153,7 +153,7 @@ export const extractionAgentOutputSchema = z.object({
       }
       return Object.keys(out).length ? out : undefined;
     },
-    z.record(z.string()).optional()
+    z.record(z.string(), z.string()).optional()
   ),
 });
 
