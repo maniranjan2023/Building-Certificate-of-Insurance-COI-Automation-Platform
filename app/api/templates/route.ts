@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     const body = z
       .object({
         key: z.enum(EMAIL_TEMPLATE_KEYS as unknown as [string, ...string[]]),
-        previewVariables: z.record(z.string()).optional(),
+        previewVariables: z.record(z.string(), z.string()).optional(),
       })
       .parse(await request.json());
 
@@ -62,7 +62,7 @@ export async function POST(request: Request) {
     return jsonOk({ subject: rendered.subject, body: rendered.text });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return jsonError(error.errors[0]?.message ?? "Invalid request.", 400);
+      return jsonError(error.issues[0]?.message ?? "Invalid request.", 400);
     }
     const message =
       error instanceof Error ? error.message : "Preview failed.";
