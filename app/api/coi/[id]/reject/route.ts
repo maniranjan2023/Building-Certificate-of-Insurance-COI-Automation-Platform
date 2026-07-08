@@ -28,7 +28,7 @@ export async function POST(request: Request, context: RouteContext) {
       return jsonError(error.message, 400);
     }
     if (error instanceof z.ZodError) {
-      return jsonError(error.errors[0]?.message ?? "Invalid request.", 400);
+      return jsonError(error.issues[0]?.message ?? "Invalid request.", 400);
     }
     const message =
       error instanceof Error ? error.message : "Failed to reject COI.";

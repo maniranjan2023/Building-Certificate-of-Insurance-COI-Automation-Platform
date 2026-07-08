@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { AUTH_COOKIE_NAME, verifySessionToken } from "@/lib/auth";
 
 const PUBLIC_PATHS = [
+  "/",
   "/login",
   "/api/auth/login",
   "/api/auth/logout",
