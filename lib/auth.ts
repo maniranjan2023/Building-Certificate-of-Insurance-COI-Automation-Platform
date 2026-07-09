@@ -32,14 +32,6 @@ export async function verifyAdminCredentials(
     return false;
   }
 
-  if (process.env.NODE_ENV === "production") {
-    const hash = env.ADMIN_PASSWORD_HASH;
-    if (!hash || typeof hash !== "string") {
-      return false;
-    }
-    return bcrypt.compare(password, hash);
-  }
-
   if (env.ADMIN_PASSWORD_HASH) {
     return bcrypt.compare(password, env.ADMIN_PASSWORD_HASH);
   }

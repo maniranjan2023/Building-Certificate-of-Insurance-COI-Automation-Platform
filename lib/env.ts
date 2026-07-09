@@ -181,16 +181,6 @@ function parseEnv(): Env {
   }
 
   if (process.env.NODE_ENV === "production") {
-    if (!parsed.data.ADMIN_PASSWORD_HASH) {
-      throw new Error(
-        "ADMIN_PASSWORD_HASH is required in production. Plaintext ADMIN_PASSWORD is not allowed."
-      );
-    }
-    if (parsed.data.ADMIN_PASSWORD) {
-      throw new Error(
-        "ADMIN_PASSWORD must not be set in production. Use ADMIN_PASSWORD_HASH only."
-      );
-    }
     if (!parsed.data.AGENTMAIL_WEBHOOK_SECRET?.trim()) {
       throw new Error("AGENTMAIL_WEBHOOK_SECRET is required in production.");
     }

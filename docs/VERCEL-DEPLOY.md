@@ -7,7 +7,7 @@ The app validates environment variables at runtime. In **production**, missing o
 | Missing / wrong var | Symptom |
 |---------------------|---------|
 | `JWT_SECRET` (min 32 chars) | Login/session fails |
-| `ADMIN_PASSWORD_HASH` | Login returns 500 (plaintext `ADMIN_PASSWORD` is rejected in production) |
+| `ADMIN_PASSWORD` | Login (plain text supported; hash optional via `ADMIN_PASSWORD_HASH`) |
 | `DATABASE_URL` | Dashboard and data pages return 500 |
 | `REDIS_URL` | Env validation fails; queues/sessions break |
 | `AGENTMAIL_WEBHOOK_SECRET` | Env validation fails in production |
@@ -26,7 +26,7 @@ Set these in **Vercel → Project → Settings → Environment Variables** (Prod
 DATABASE_URL=postgresql://...
 JWT_SECRET=<random string, at least 32 characters>
 ADMIN_EMAIL=admin@yourdomain.com
-ADMIN_PASSWORD_HASH=<bcrypt hash — see below>
+ADMIN_PASSWORD=<your admin password>
 REDIS_URL=rediss://...
 CLOUDINARY_CLOUD_NAME=...
 CLOUDINARY_API_KEY=...
@@ -35,13 +35,13 @@ AGENTMAIL_WEBHOOK_SECRET=<random secret>
 HEALTH_CHECK_SECRET=<random secret>
 ```
 
-### Generate `ADMIN_PASSWORD_HASH`
+### Optional: bcrypt hash instead of plain password
 
 ```bash
 node -e "const bcrypt=require('bcryptjs'); bcrypt.hash('YOUR_PASSWORD', 12).then(console.log)"
 ```
 
-Paste the output into `ADMIN_PASSWORD_HASH`. **Do not** set `ADMIN_PASSWORD` in production.
+Set `ADMIN_PASSWORD_HASH` if you prefer a hash; when both are set, the hash wins.
 
 ### Optional but recommended
 
@@ -65,7 +65,7 @@ DIRECT_URL=...          # Neon direct connection (migrations)
 
 - `https://your-app.vercel.app/` — marketing page loads
 - `https://your-app.vercel.app/login` — login form loads
-- Sign in with `ADMIN_EMAIL` + password used to generate the hash
+- Sign in with `ADMIN_EMAIL` + `ADMIN_PASSWORD`
 - `/dashboard` — portfolio loads after auth
 
 ## Health checks
