@@ -1,58 +1,93 @@
-import { glassPanel, glassSection } from "@/components/marketing/glass-styles";
+"use client";
+
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { Timeline, type TimelineItem } from "@/components/ui/timeline";
+import { LandingMotionSection } from "@/components/marketing/landing-motion-section";
+import { glassBadge, glassPanel } from "@/components/marketing/glass-styles";
 import { cn } from "@/lib/utils";
 
-const STEPS = [
+const STEPS: TimelineItem[] = [
   {
-    step: "01",
-    title: "Intake",
-    description:
-      "Tenant emails a COI PDF or admin uploads from the dashboard. File lands in Cloudinary, a job hits the BullMQ queue, and a receipt email goes out automatically.",
+    id: "intake",
+    title: "Tenant submits",
+    description: "Email or dashboard upload — every COI is captured and linked to the right lease.",
+    status: "completed",
   },
   {
-    step: "02",
-    title: "AI processing",
-    description:
-      "The worker runs OCR, then five agents in sequence: classify → extract → checklist → risk → report. Results and citations land on the COI detail page.",
+    id: "review",
+    title: "Instant validation",
+    description: "Coverage limits, dates, and endorsements checked against your requirements.",
+    status: "completed",
   },
   {
-    step: "03",
-    title: "Admin review",
-    description:
-      "Edit the draft report, adjust citations, then Accept, Reject, or Send a custom email. Acceptance gates block approval until mandatory checklist items pass.",
+    id: "decide",
+    title: "Your team decides",
+    description: "Accept, reject, or request fixes — with a draft message ready to send.",
+    status: "active",
   },
   {
-    step: "04",
-    title: "Tenant reply",
-    description:
-      "Templated outbound emails render from your template library, pass a final guardrail, and send via AgentMail — with a full OutboundEmail audit record.",
+    id: "renew",
+    title: "Stay ahead of expiry",
+    description: "Automated renewal reminders before policies lapse across the portfolio.",
+    status: "pending",
+  },
+];
+
+const STEP_DETAILS = [
+  {
+    title: "One intake path for every tenant",
+    body: "No more hunting through inboxes. Submissions arrive in a single compliance queue with the tenant, property, and version already attached.",
+  },
+  {
+    title: "Consistent standards, every time",
+    body: "The same checklist applies to every COI — whether it’s a move-in, renewal, or resubmission after a rejection.",
+  },
+  {
+    title: "Clear communication, fewer cycles",
+    body: "Tenants know exactly what to fix. Your team reviews the message before it goes out — no more vague “please resubmit” loops.",
+  },
+  {
+    title: "Compliance you can prove",
+    body: "Every upload, review, decision, and outbound message is recorded — ready for audits, lenders, and internal reporting.",
   },
 ];
 
 export function LandingHowItWorks() {
   return (
-    <section id="how-it-works" className={cn("py-20 sm:py-28", glassSection)}>
+    <section id="how-it-works" className="py-20 sm:py-28">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <div className="mx-auto max-w-2xl text-center">
-          <p className="text-sm font-medium text-primary">How it works</p>
-          <h2 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
-            From inbox to approved COI in four steps
+        <LandingMotionSection className="mx-auto max-w-3xl text-center">
+          <Badge variant="outline" className={cn("mb-4 px-3 py-1", glassBadge)}>
+            How it works
+          </Badge>
+          <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+            From submission to approved COI — without the manual grind
           </h2>
           <p className="mt-4 text-muted-foreground">
-            Human-in-the-loop by design — AI recommends, your team decides.
+            A simple workflow your team already understands — powered by automation where it
+            matters most.
           </p>
-        </div>
+        </LandingMotionSection>
 
-        <div className="mt-14 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-          {STEPS.map((item) => (
-            <div key={item.step} className={cn("relative p-6", glassPanel)}>
-              <span className="text-3xl font-semibold tabular-nums text-primary/40">
-                {item.step}
-              </span>
-              <h3 className="mt-4 text-lg font-semibold">{item.title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                {item.description}
-              </p>
-            </div>
+        <LandingMotionSection delay={0.08} className="mt-12">
+          <div className={cn("p-6 sm:p-8", glassPanel)}>
+            <Timeline items={STEPS} variant="spacious" orientation="horizontal" />
+          </div>
+        </LandingMotionSection>
+
+        <div className="mt-10 grid gap-5 sm:grid-cols-2">
+          {STEP_DETAILS.map((detail, index) => (
+            <LandingMotionSection key={detail.title} delay={index * 0.05}>
+              <Card className={cn("h-full border-0 bg-transparent shadow-none", glassPanel)}>
+                <CardContent className="p-6">
+                  <h3 className="font-semibold">{detail.title}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                    {detail.body}
+                  </p>
+                </CardContent>
+              </Card>
+            </LandingMotionSection>
           ))}
         </div>
       </div>

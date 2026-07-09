@@ -1,0 +1,11 @@
+{
+  "elements": [{
+    "type": "diagram",
+    "id": "coi-platform-architecture",
+    "diagramType": "cloud-architecture-diagram",
+    "code": "direction down\ncolorMode bold\nstyleMode shadow\ntypeface clean\n\nTenant [icon: user]\nAdmin [icon: user]\n\nAgentMail [icon: email, color: blue]\nWebhook [label: \"Webhook API\", icon: api]\n\nCOI App [icon: next-js, color: green] {\n  Dashboard [label: \"Next.js Admin UI\", icon: browser]\n  REST API [label: \"REST API Routes\", icon: api]\n}\n\nNeonDB [label: \"Neon Postgres\", icon: postgresql]\nCloudinary [icon: cloud]\nRedis [label: \"Upstash Redis\", icon: redis]\n\nWorker [icon: server, color: orange] {\n  ProcessJob [label: \"process-coi\", icon: cog]\n  EmailJob [label: \"send-template-email\", icon: mail]\n}\n\nAI [icon: brain, color: purple] {\n  OCR [label: \"LlamaParse OCR\", icon: file-text]\n  Agents [label: \"5 AI Agents + Guardrails\", icon: robot]\n}\n\nGroq [label: \"Groq LLM\", icon: ai]\n\nTenant > AgentMail\nAgentMail > Webhook\nWebhook > REST API\nAdmin > Dashboard\nDashboard > REST API\nREST API > NeonDB\nREST API > Cloudinary\nREST API > Redis\nRedis > ProcessJob\nProcessJob > Cloudinary\nProcessJob > OCR\nOCR > Agents\nAgents > Groq\nProcessJob > NeonDB\nDashboard > EmailJob\nEmailJob > AgentMail\nEmailJob > NeonDB\nAgentMail > Tenant"
+  }],
+  "scale": 1,
+  "theme": "dark",
+  "background": true
+}

@@ -2,7 +2,9 @@ import {
   IntakeSource,
   type CoiDocument,
   type CoiJob,
+  type CoiStatus,
   type CoiVersion,
+  type Sender,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { uploadCoiBuffer, uploadCoiDocument, deleteCloudinaryAsset } from "@/lib/services/cloudinary";
@@ -18,6 +20,14 @@ import {
 
 export type CoiSubmissionRow = CoiVersionWithRelations & {
   latestJob: CoiJob | null;
+};
+
+export type CoiDocumentDetail = CoiDocument & {
+  version: CoiVersionWithRelations | null;
+  sender: Sender | null;
+  latestJob: CoiJob | null;
+  status: CoiStatus | null;
+  senderEmail: string | null;
 };
 
 const ALLOWED_MIME_TYPES = new Set([
@@ -271,7 +281,9 @@ export async function deleteCoiDocumentById(id: string): Promise<void> {
   });
 }
 
-export async function getCoiDocumentByIdWithLatestJob(id: string) {
+export async function getCoiDocumentByIdWithLatestJob(
+  id: string
+): Promise<CoiDocumentDetail | null> {
   const { withDbRetry } = await import("@/lib/utils/db-retry");
   return withDbRetry(async () => {
     const version = await getVersionByDocumentId(id);

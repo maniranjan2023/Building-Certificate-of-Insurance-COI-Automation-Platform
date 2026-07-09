@@ -16,6 +16,7 @@ import { JobStatusBadge } from "@/components/ui/job-status-badge";
 import { VersionBadge } from "@/components/ui/version-badge";
 import { Button } from "@/components/ui/button";
 import { CoiDeleteButton } from "@/components/coi/coi-delete-button";
+import { AuditExportButton } from "@/components/coi/audit-export-button";
 
 interface CoiDetailHeaderProps {
   documentId: string;
@@ -146,6 +147,7 @@ export function CoiDetailHeader({
                   Open file
                 </a>
               </Button>
+              <AuditExportButton documentId={documentId} />
               <CoiDeleteButton
                 documentId={documentId}
                 fileName={fileName}

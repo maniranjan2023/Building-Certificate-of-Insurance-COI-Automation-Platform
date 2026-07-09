@@ -1,5 +1,11 @@
-import type { ChecklistAgentOutput, ExtractionAgentOutput } from "@/lib/ai/schemas";
+import type { ChecklistAgentOutput } from "@/lib/ai/schemas";
 import { MIN_POLICY_DAYS } from "@/lib/services/acceptance-gates-shared";
+import {
+  asExtraction,
+  daysBetween,
+  parseCoiDate,
+  startOfDay,
+} from "@/lib/utils/coi-dates";
 
 export interface AcceptanceEligibility {
   canAccept: boolean;
@@ -18,25 +24,6 @@ function asChecklist(value: unknown): ChecklistAgentOutput | null {
     mandatoryFailures: Array.isArray(raw.mandatoryFailures) ? raw.mandatoryFailures : [],
     allPassed: raw.allPassed ?? false,
   };
-}
-
-function asExtraction(value: unknown): ExtractionAgentOutput | null {
-  return value && typeof value === "object" ? (value as ExtractionAgentOutput) : null;
-}
-
-function parseDate(value: string | null | undefined): Date | null {
-  if (!value?.trim()) return null;
-  const us = value.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
-  if (us) {
-    const year = us[3].length === 2 ? 2000 + parseInt(us[3], 10) : parseInt(us[3], 10);
-    return new Date(year, parseInt(us[1], 10) - 1, parseInt(us[2], 10));
-  }
-  const iso = Date.parse(value);
-  return Number.isNaN(iso) ? null : new Date(iso);
-}
-
-function daysBetween(start: Date, end: Date): number {
-  return Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
 }
 
 export function evaluateAcceptanceEligibility(options: {
@@ -68,15 +55,14 @@ export function evaluateAcceptanceEligibility(options: {
     );
   }
 
-  const expiration = parseDate(extraction?.expirationDate);
-  const effective = parseDate(extraction?.effectiveDate);
+  const expiration = parseCoiDate(extraction?.expirationDate);
+  const effective = parseCoiDate(extraction?.effectiveDate);
   let expiryValid = false;
 
   if (!expiration) {
     blockers.push("A valid policy expiration date is required before acceptance.");
   } else {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = startOfDay(new Date());
     if (expiration < today) {
       blockers.push(
         `Policy is expired (${extraction?.expirationDate}). Tenant must submit a renewed COI with a future expiration date.`

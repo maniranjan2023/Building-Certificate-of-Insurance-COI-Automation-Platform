@@ -167,13 +167,15 @@ export async function acceptCoiVersion(documentId: string, options?: { customBod
     documentId,
     templateKey: "approved",
     customBody: options?.customBody,
-    async: false,
+    async: true,
   });
 
-  return prisma.coiVersion.findUnique({
+  const updated = await prisma.coiVersion.findUnique({
     where: { id: version.id },
     include: { sender: true, coiDocument: true },
   });
+
+  return { version: updated, emailQueued: true };
 }
 
 export async function rejectCoiVersion(
@@ -202,13 +204,15 @@ export async function rejectCoiVersion(
     templateKey: "rejected",
     rejectionReason: rejectionReason.trim(),
     customBody: options?.customBody,
-    async: false,
+    async: true,
   });
 
-  return prisma.coiVersion.findUnique({
+  const version = await prisma.coiVersion.findUnique({
     where: { coiDocumentId: documentId },
     include: { sender: true, coiDocument: true },
   });
+
+  return { version, emailQueued: true };
 }
 
 export async function sendSuggestedComplianceEmail(
@@ -234,8 +238,8 @@ export async function sendSuggestedComplianceEmail(
     templateKey,
     customBody: body,
     customSubject: options?.customSubject,
-    async: false,
+    async: true,
   });
 
-  return { templateKey, sent: true };
+  return { templateKey, queued: true };
 }

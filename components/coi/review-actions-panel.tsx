@@ -185,7 +185,7 @@ export function ReviewActionsPanel({
         setGuardrailError(message);
         throw new Error(message);
       }
-      toast.success(`Email sent (${payload.data.templateKey}).`);
+      toast.success("Email queued for delivery.");
       router.refresh();
     } catch (sendError) {
       toast.error(sendError instanceof Error ? sendError.message : "Send failed");
@@ -212,7 +212,7 @@ export function ReviewActionsPanel({
         setGuardrailError(message);
         throw new Error(message);
       }
-      toast.success("COI accepted and approval email sent.");
+      toast.success("COI accepted. Approval email is being sent.");
       router.refresh();
       await loadReview();
     } catch (acceptError) {
@@ -240,7 +240,7 @@ export function ReviewActionsPanel({
         setGuardrailError(message);
         throw new Error(message);
       }
-      toast.success("COI rejected and tenant notified.");
+      toast.success("COI rejected. Notification email is being sent.");
       router.refresh();
     } catch (rejectError) {
       toast.error(rejectError instanceof Error ? rejectError.message : "Reject failed");
@@ -441,7 +441,7 @@ export function ReviewActionsPanel({
             size="sm"
             variant="outline"
             loading={busy === "send"}
-            loadingText="Sending…"
+            loadingText="Queueing…"
             disabled={Boolean(busy) || !recipientEmail}
             onClick={() => void sendEmail()}
           >

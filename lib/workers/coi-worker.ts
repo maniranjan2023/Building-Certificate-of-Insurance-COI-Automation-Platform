@@ -2,6 +2,7 @@ import { Worker } from "bullmq";
 import { getEnv } from "@/lib/env";
 import { handleExhaustedJobFailure } from "@/lib/queue/dlq-handler";
 import { getQueueConnection } from "@/lib/queue/connection";
+import { getWorkerBackoffSettings } from "@/lib/queue/job-options";
 import {
   PROCESS_COI_JOB_NAME,
   SEND_TEMPLATE_EMAIL_JOB_NAME,
@@ -47,7 +48,8 @@ export function createCoiWorker(): Worker<CoiQueueJobData> {
     },
     {
       connection: getQueueConnection(),
-      concurrency: 1,
+      concurrency: env.WORKER_COI_CONCURRENCY,
+      settings: getWorkerBackoffSettings(),
     }
   );
 
