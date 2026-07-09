@@ -11,11 +11,11 @@ export default async function JobsPage() {
           Automation
         </p>
         <h2 className="mt-1 text-2xl font-semibold tracking-tight">
-          Job queue & DLQ
+          Job queue, DLQ & operations
         </h2>
         <p className="mt-1.5 max-w-2xl text-sm text-muted-foreground">
-          Track COI processing jobs from dashboard uploads and AgentMail intake.
-          Failed jobs land in the dead letter queue after exponential backoff retries.
+          Live BullMQ queue depth, cron scan metrics, COI and reminder jobs, and DLQ recovery
+          with retry or dismiss.
         </p>
       </div>
 

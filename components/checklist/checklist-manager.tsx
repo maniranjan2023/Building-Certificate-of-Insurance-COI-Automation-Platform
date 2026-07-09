@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { ChecklistItem } from "@prisma/client";
-import { CHECKLIST_CATEGORIES } from "@/lib/constants/checklist-categories";
+import { CHECKLIST_CATEGORIES, type ChecklistCategory } from "@/lib/constants/checklist-categories";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,7 +19,12 @@ export function ChecklistManager({ initialItems }: ChecklistManagerProps) {
   const [items, setItems] = useState(initialItems);
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<{
+    requirement: string;
+    expectedValue: string;
+    mandatory: boolean;
+    category: ChecklistCategory;
+  }>({
     requirement: "",
     expectedValue: "",
     mandatory: true,
@@ -114,7 +119,7 @@ export function ChecklistManager({ initialItems }: ChecklistManagerProps) {
       requirement: item.requirement,
       expectedValue: item.expectedValue,
       mandatory: item.mandatory,
-      category: item.category,
+      category: item.category as ChecklistCategory,
     });
   }
 
@@ -167,7 +172,7 @@ export function ChecklistManager({ initialItems }: ChecklistManagerProps) {
                 onChange={(event) =>
                   setForm((current) => ({
                     ...current,
-                    category: event.target.value,
+                    category: event.target.value as ChecklistCategory,
                   }))
                 }
               >

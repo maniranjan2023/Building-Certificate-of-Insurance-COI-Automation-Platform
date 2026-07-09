@@ -75,10 +75,9 @@ export const dashboardNavigation: NavSection[] = [
       {
         href: "/metrics",
         label: "Metrics",
-        description: "Portfolio insights",
+        description: "Portfolio & email engagement",
         icon: BarChart3,
-        enabled: false,
-        badge: "Soon",
+        enabled: true,
       },
     ],
   },

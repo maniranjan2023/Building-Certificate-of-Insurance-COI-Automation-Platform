@@ -115,6 +115,7 @@ export async function processAgentMailWebhook(
       await sendAutoIntakeEmail({
         template: "receipt_acknowledged",
         to: senderEmail,
+        coiVersionId: submission.version.id,
         context: {
           senderEmail,
           versionNumber: submission.version.versionNumber,

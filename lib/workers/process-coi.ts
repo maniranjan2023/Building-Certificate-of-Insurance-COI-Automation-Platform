@@ -24,6 +24,7 @@ async function notifyProcessingError(data: ProcessCoiJobData): Promise<void> {
     await sendAutoIntakeEmail({
       template: "processing_error",
       to: email,
+      coiVersionId: data.coiVersionId,
       context: { senderEmail: email },
       replyToMessageId: data.agentMailMessageId ?? undefined,
       inboxId: data.agentMailInboxId ?? undefined,

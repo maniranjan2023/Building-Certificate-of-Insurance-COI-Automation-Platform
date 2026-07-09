@@ -14,8 +14,8 @@ export async function POST(request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
     const body = bodySchema.parse(await request.json().catch(() => ({})));
-    const version = await acceptCoiVersion(id, { customBody: body.customBody });
-    return jsonOk(version);
+    const result = await acceptCoiVersion(id, { customBody: body.customBody });
+    return jsonOk(result);
   } catch (error) {
     if (error instanceof AdminOutboundGuardrailError) {
       return jsonError(error.message, 400);

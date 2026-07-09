@@ -180,7 +180,7 @@ export async function parseDocumentBuffer(
     return {
       markdown: markdown || text,
       text: text || markdown,
-      layoutPages: extractLayoutPages(result),
+      layoutPages: extractLayoutPages(result as Parameters<typeof extractLayoutPages>[0]),
     };
   });
 }

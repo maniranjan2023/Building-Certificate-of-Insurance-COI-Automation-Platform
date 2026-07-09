@@ -74,6 +74,7 @@ model CoiDocument {
   updatedAt          DateTime     @updatedAt
   version            CoiVersion?
   jobs               CoiJob[]
+  reminderLogs       ReminderLog[]
 
   @@index([createdAt])
   @@index([senderEmail])
@@ -97,6 +98,8 @@ model CoiVersion {
   aiSuggestedTemplate String?
   /** Mandatory/optional field locations from LlamaParse layout (for PDF overlay). */
   fieldBoundingBoxes Json?
+  /** Denormalized from extractedFields.expirationDate for indexed cron queries (Phase 6). */
+  expirationDate   DateTime?
   jobs            CoiJob[]
   aiRuns          AiRun[]
   outboundEmails  OutboundEmail[]
@@ -106,6 +109,8 @@ model CoiVersion {
   @@unique([senderId, versionNumber])
   @@index([senderId])
   @@index([status])
+  @@index([expirationDate])
+  @@index([status, expirationDate])
   @@index([createdAt])
 }
 
@@ -207,8 +212,8 @@ model EmailTemplate {
 
 model OutboundEmail {
   id                 String              @id @default(cuid())
-  coiVersionId       String
-  coiVersion         CoiVersion          @relation(fields: [coiVersionId], references: [id], onDelete: Cascade)
+  coiVersionId       String?
+  coiVersion         CoiVersion?         @relation(fields: [coiVersionId], references: [id], onDelete: Cascade)
   templateKey        String
   template           EmailTemplate       @relation(fields: [templateKey], references: [key], onDelete: Restrict)
   toEmail            String
@@ -223,4 +228,38 @@ model OutboundEmail {
   @@index([coiVersionId])
   @@index([templateKey])
   @@index([createdAt])
+  @@index([status])
+}
+
+model ReminderLog {
+  id            String      @id @default(cuid())
+  coiDocumentId String
+  coiDocument   CoiDocument @relation(fields: [coiDocumentId], references: [id], onDelete: Cascade)
+  coiVersionId  String?
+  daysBefore    Int
+  coiJobId      String?
+  sentAt        DateTime    @default(now())
+
+  /** Unique per COI + reminder window — enforces idempotency at DB level. */
+  @@unique([coiDocumentId, daysBefore])
+  @@index([coiDocumentId])
+  @@index([sentAt])
+}
+
+model CronScanLog {
+  id                      String    @id @default(cuid())
+  startedAt               DateTime  @default(now())
+  completedAt             DateTime?
+  durationMs              Int?
+  scanned                 Int       @default(0)
+  statusUpdates           Int       @default(0)
+  remindersEnqueued       Int       @default(0)
+  skippedAlreadySent      Int       @default(0)
+  skippedNoEmail          Int       @default(0)
+  skippedNoExpiry         Int       @default(0)
+  expirationDatesBackfilled Int     @default(0)
+  errorMessage            String?
+  lockSkipped             Boolean   @default(false)
+
+  @@index([startedAt])
 }

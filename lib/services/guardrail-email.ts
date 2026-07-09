@@ -1,4 +1,4 @@
-import type { AgentStep } from "@prisma/client";
+import { Prisma, type AgentStep } from "@prisma/client";
 import { guardrailTripwireMessage, isGuardrailTripwireError } from "@/lib/ai/guardrail-runner";
 import type { ReportAgentOutput } from "@/lib/ai/schemas";
 import { persistCoiVersionAiResults } from "@/lib/services/ai-run";
@@ -156,7 +156,7 @@ Thank you,
   };
 
   await persistCoiVersionAiResults(coiVersionId, {
-    draftReport,
+    draftReport: draftReport as unknown as Prisma.InputJsonValue,
     aiSuggestedTemplate: payload.suggestedTemplate,
   });
 }

@@ -7,6 +7,7 @@ import {
   type Prisma as PrismaTypes,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { expirationDateFromExtraction } from "@/lib/services/expiration-date-sync";
 
 export type AiRunWithSteps = PrismaTypes.AiRunGetPayload<{
   include: { steps: { orderBy: { stepOrder: "asc" } } };
@@ -21,7 +22,7 @@ function isUniqueConstraintError(error: unknown): boolean {
 
 function aiRunResetData(coiVersionId: string): PrismaTypes.AiRunUpdateInput {
   return {
-    coiVersionId,
+    coiVersion: { connect: { id: coiVersionId } },
     status: AiRunStatus.RUNNING,
     startedAt: new Date(),
     completedAt: null,
@@ -194,6 +195,11 @@ export async function persistCoiVersionAiResults(
     fieldBoundingBoxes?: PrismaTypes.InputJsonValue;
   }
 ): Promise<void> {
+  const expirationDate =
+    data.extractedFields !== undefined
+      ? expirationDateFromExtraction(data.extractedFields)
+      : undefined;
+
   await prisma.coiVersion.update({
     where: { id: coiVersionId },
     data: {
@@ -204,6 +210,7 @@ export async function persistCoiVersionAiResults(
       draftReport: data.draftReport,
       aiSuggestedTemplate: data.aiSuggestedTemplate,
       fieldBoundingBoxes: data.fieldBoundingBoxes,
+      ...(expirationDate !== undefined ? { expirationDate } : {}),
     },
   });
 }

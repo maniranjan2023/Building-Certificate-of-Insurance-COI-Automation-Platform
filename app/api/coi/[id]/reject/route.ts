@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { jsonError, jsonOk } from "@/lib/api-response";
 import { AdminOutboundGuardrailError } from "@/lib/services/admin-outbound-guardrail";
-import { rejectCoiVersion, ReviewActionError } from "@/lib/services/review-actions";import { VersionValidationError } from "@/lib/services/version";
+import { rejectCoiVersion, ReviewActionError } from "@/lib/services/review-actions";
+import { VersionValidationError } from "@/lib/services/version";
 
 const bodySchema = z.object({
   rejectionReason: z.string().min(1, "Rejection reason is required."),
@@ -16,10 +17,10 @@ export async function POST(request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
     const body = bodySchema.parse(await request.json());
-    const version = await rejectCoiVersion(id, body.rejectionReason, {
+    const result = await rejectCoiVersion(id, body.rejectionReason, {
       customBody: body.customBody,
     });
-    return jsonOk(version);
+    return jsonOk(result);
   } catch (error) {
     if (error instanceof AdminOutboundGuardrailError) {
       return jsonError(error.message, 400);

@@ -750,7 +750,8 @@ Configurable via environment variables (see [Environment Variables](#environment
 |----------|-----------|
 | AgentMail webhook duplicate | Dedup by `messageId` in Redis or DB before enqueue |
 | Reminder duplicate | `ReminderLog` in Postgres (`coiId` + `daysBefore` unique) |
-| Cron runs twice | Redis distributed lock during daily scan (Phase 6) |
+| Cron runs twice | Redis distributed lock with token + TTL renewal during daily scan (Phase 6) |
+| DLQ triage | `/dashboard/jobs` — filter COI vs reminder, retry or dismiss (Phase 6) |
 
 ### npm packages (Phase 2+)
 
@@ -766,6 +767,11 @@ npm install node-cron    # Phase 6
 | Next.js app | `npm run dev` | 1+ |
 | BullMQ worker | `npm run worker` | 2+ |
 | node-cron scheduler | `npm run cron` | 6 |
+| Ops smoke test | `npm run test:ops` | 6 |
+
+**Jobs dashboard** (`/dashboard/jobs`): live queue depth, cron scan history, DLQ filters (All/COI/Reminders), retry and dismiss actions.
+
+**Health probes** (no auth): `GET /api/health`, `/api/health/database`, `/api/health/redis`, `/api/health/queue`.
 
 ---
 
@@ -1091,10 +1097,20 @@ Full setup, test steps, and troubleshooting: **[docs/PHASE2.md](docs/PHASE2.md)*
 | 1 | Expiry + renewal reminders | node-cron → `reminder-jobs` at 30/14/7/3 days; worker sends via AgentMail; failures → `reminder-jobs-dlq` |
 | 2 | Metrics dashboard | Compliance %, ROI, savings, turnaround, automation % with live calculations |
 | 3 | Full audit log | Immutable files, agent steps, emails, decisions, checklist/template changes |
+| 9 | Worker concurrency | `WORKER_COI_CONCURRENCY` / `WORKER_REMINDER_CONCURRENCY` tune parallel job processing |
+| 10 | Email rate limiting | BullMQ limiter caps reminder sends (`REMINDER_EMAIL_RATE_LIMIT_MAX` per window) |
+| 11 | Distributed lock renewal | Token-based Redis lock with TTL renewal prevents duplicate cron scans |
+| 12 | Retry + jitter | Exponential backoff with 25% jitter on both COI and reminder workers |
+| 13 | Queue monitoring | `GET /api/queues/metrics` + live panel on `/dashboard/jobs` |
+| 14 | Health endpoints | Public `/api/health`, `/database`, `/redis`, `/queue` for uptime probes |
+| 15 | Structured logging | Cron + reminder events to console/Logfire; `CronScanLog` persisted per run |
+| 16 | DLQ dashboard | Filter COI vs reminder DLQ, retry, dismiss, cron scan history table |
 
-**Problem solved:** No more lapsed coverage surprises. Landlord sees portfolio compliance health and quantified ROI.
+**Problem solved:** No more lapsed coverage surprises. Landlord sees portfolio compliance health, quantified ROI, and full operational visibility into queues and cron runs.
 
-**Exit criteria:** COI nearing expiry triggers reminder emails → metrics dashboard reflects live compliance state → full audit trail retrievable per COI.
+**Exit criteria:** COI nearing expiry triggers reminder emails → metrics dashboard reflects live compliance state → full audit trail retrievable per COI → queue health and DLQ triage available on Jobs dashboard.
+
+See **[docs/PHASE6.md](docs/PHASE6.md)** for setup, env vars, API reference, and verify steps.
 
 ---
 
@@ -1164,6 +1180,17 @@ JOB_BACKOFF_DELAY_MS=5000
 
 # Scheduler (Phase 6)
 CRON_SCHEDULE=0 9 * * *
+REMINDER_DAYS_BEFORE=30,14,7,3
+MANUAL_REVIEW_MINUTES=20
+HOURLY_RATE_USD=45
+PLATFORM_COST_ANNUAL_USD=1200
+
+# Ops — worker concurrency, rate limits, cron lock (Phase 6)
+WORKER_COI_CONCURRENCY=2
+WORKER_REMINDER_CONCURRENCY=3
+REMINDER_EMAIL_RATE_LIMIT_MAX=100
+REMINDER_EMAIL_RATE_LIMIT_MS=60000
+CRON_LOCK_TTL_SECONDS=1800
 
 # AI — Groq via OpenAI SDK (Phase 4+)
 GROQ_API_KEY=gsk_xxx
@@ -1216,6 +1243,12 @@ npm run worker
 # 4. node-cron — enqueues reminder-jobs only (separate terminal, Phase 6)
 npm run cron
 
+# Optional: run one expiry scan immediately
+npm run cron:now
+
+# Ops smoke test (health, lock, queue metrics — Phase 6)
+npm run test:ops
+
 # 5. AgentMail webhook tunnel (separate terminal — email intake only)
 # Use a reserved static domain so the URL never changes:
 ngrok http 3000 --domain=your-subdomain.ngrok-free.app
@@ -1255,6 +1288,7 @@ coi-platform/
 │   ├── queue/                     # Redis connection, queue definitions, enqueue helpers
 │   ├── workers/                   # process-coi, send-template-email, send-reminder handlers
 │   ├── cron/                      # node-cron expiry scan → reminder-jobs (Phase 6)
+│   ├── observability/             # Structured logging + Logfire (Phase 6)
 │   ├── agents/                    # AI agent chain (1–5)
 │   ├── services/                  # Cloudinary, email, DB helpers
 │   └── auth.ts                    # JWT helpers
@@ -1262,10 +1296,12 @@ coi-platform/
 │   └── schema.prisma              # Neon PostgreSQL schema
 ├── docs/
 │   ├── PHASE1.md                  # Phase 1 run & verify
-│   └── PHASE2.md                  # Phase 2 run & verify
+│   ├── PHASE2.md                  # Phase 2 run & verify
+│   └── PHASE6.md                  # Phase 6 renewal, metrics, ops
 ├── scripts/
 │   ├── worker.ts                  # BullMQ worker (coi-jobs + reminder-jobs)
-│   └── cron.ts                    # node-cron entry (enqueue reminder-jobs only)
+│   ├── cron.ts                    # node-cron entry (enqueue reminder-jobs only)
+│   └── test-ops-features.ts       # Ops smoke test (Phase 6)
 ├── agent.py                       # Phase 2 prototype (to be replaced)
 ├── .env
 └── README.md
