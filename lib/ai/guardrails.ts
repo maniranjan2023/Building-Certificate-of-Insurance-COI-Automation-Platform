@@ -19,8 +19,15 @@ const INJECTION_PATTERNS = [
   "jailbreak",
 ];
 
+function normalizeGuardInput(input: string): string {
+  return input
+    .normalize("NFKC")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .toLowerCase();
+}
+
 export function ruleBasedInjectionGuard(input: string): GuardrailFunctionOutput {
-  const lower = input.toLowerCase();
+  const lower = normalizeGuardInput(input);
   const hit = INJECTION_PATTERNS.find((p) => lower.includes(p));
   return {
     tripwireTriggered: Boolean(hit),
@@ -53,7 +60,10 @@ export async function llmSafetyGuard(input: string): Promise<GuardrailFunctionOu
       outputInfo: parsed.reason ?? "LLM safety check complete",
     };
   } catch {
-    return { tripwireTriggered: false, outputInfo: "Safety check parse skipped" };
+    return {
+      tripwireTriggered: true,
+      outputInfo: "LLM safety check returned invalid JSON (fail closed)",
+    };
   }
 }
 
@@ -135,8 +145,8 @@ export const coiLlmSafetyInputGuardrail = defineInputGuardrail({
   runInParallel: false,
   execute: async ({ input }) => {
     const text = typeof input === "string" ? input : JSON.stringify(input);
-    if (text.length <= 200) {
-      return { tripwireTriggered: false, outputInfo: "Input too short for LLM safety check" };
+    if (!text.trim()) {
+      return { tripwireTriggered: false, outputInfo: "Empty input" };
     }
     return llmSafetyGuard(text);
   },
@@ -174,7 +184,6 @@ export function checklistItemsOutputGuardrail(expectedCount: number) {
   });
 }
 
-/** Official SDK output guardrail — report missingItems must match checklist labels. */
 export function reportMissingItemsOutputGuardrail(allowedMissingLabels: string[]) {
   return defineOutputGuardrail({
     name: "report_missing_items",
@@ -194,6 +203,58 @@ export function reportMissingItemsOutputGuardrail(allowedMissingLabels: string[]
           };
         }
         return { tripwireTriggered: false, outputInfo: "Report missingItems valid" };
+      } catch {
+        return {
+          tripwireTriggered: true,
+          outputInfo: "Report output is not valid JSON",
+        };
+      }
+    },
+  });
+}
+
+const SUGGESTED_EMAIL_UNSAFE_PATTERNS = [
+  /https?:\/\/[^\s]+/i,
+  /\bwire\s+transfer\b/i,
+  /\bbank\s+account\b/i,
+  /\bsend\s+payment\b/i,
+  /\bvenmo\b/i,
+  /\bzelle\b/i,
+];
+
+/** Output guardrail — report agent suggestedEmailBody must be tenant-safe. */
+export function suggestedEmailBodyOutputGuardrail() {
+  return defineOutputGuardrail({
+    name: "suggested_email_body",
+    execute: async ({ agentOutput }) => {
+      const raw =
+        typeof agentOutput === "string" ? agentOutput : JSON.stringify(agentOutput);
+      try {
+        const data = JSON.parse(raw) as { suggestedEmailBody?: string };
+        const body = data.suggestedEmailBody?.trim() ?? "";
+        if (!body) {
+          return { tripwireTriggered: false, outputInfo: "No suggested email body" };
+        }
+
+        const injection = ruleBasedInjectionGuard(body);
+        if (injection.tripwireTriggered) {
+          return {
+            tripwireTriggered: true,
+            outputInfo: String(injection.outputInfo),
+          };
+        }
+
+        const unsafe = SUGGESTED_EMAIL_UNSAFE_PATTERNS.find((pattern) =>
+          pattern.test(body)
+        );
+        if (unsafe) {
+          return {
+            tripwireTriggered: true,
+            outputInfo: `suggestedEmailBody contains disallowed content (${unsafe.source}).`,
+          };
+        }
+
+        return { tripwireTriggered: false, outputInfo: "suggestedEmailBody valid" };
       } catch {
         return {
           tripwireTriggered: true,

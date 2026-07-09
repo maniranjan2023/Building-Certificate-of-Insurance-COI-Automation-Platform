@@ -13,6 +13,7 @@ import { resolveSenderIdForDocument } from "@/lib/services/tenant-activity";
 import { FileImage } from "lucide-react";
 import type { ReportAgentOutput } from "@/lib/ai/schemas";
 import { JobStatus } from "@prisma/client";
+import { coiAssetApiPath } from "@/lib/coi-asset-path";
 
 interface CoiDetailPageProps {
   params: Promise<{ id: string }>;
@@ -50,7 +51,6 @@ export default async function CoiDetailPage({ params }: CoiDetailPageProps) {
         fileSizeBytes={document.fileSizeBytes}
         mimeType={document.mimeType}
         intakeSource={document.intakeSource}
-        cloudinaryUrl={document.cloudinaryUrl}
         senderEmail={document.senderEmail}
         senderId={senderRef?.senderId ?? null}
         versionNumber={document.version?.versionNumber ?? null}
@@ -82,7 +82,7 @@ export default async function CoiDetailPage({ params }: CoiDetailPageProps) {
                 <div className="overflow-hidden rounded-xl border bg-muted/30">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={document.cloudinaryUrl}
+                    src={coiAssetApiPath(id)}
                     alt={document.fileName}
                     className="max-h-[70vh] w-full object-contain"
                   />

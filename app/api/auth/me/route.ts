@@ -1,10 +1,11 @@
-import { getSession } from "@/lib/auth";
-import { jsonOk, jsonUnauthorized } from "@/lib/api-response";
+import { jsonOk } from "@/lib/api-response";
+import {
+  isSessionResponse,
+  requireApiSession,
+} from "@/lib/api/require-api-session";
 
 export async function GET() {
-  const session = await getSession();
-  if (!session) {
-    return jsonUnauthorized();
-  }
+  const session = await requireApiSession();
+  if (isSessionResponse(session)) return session;
   return jsonOk(session);
 }

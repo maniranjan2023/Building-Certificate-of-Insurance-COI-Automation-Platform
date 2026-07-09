@@ -1,12 +1,19 @@
 import { z } from "zod";
 import { jsonError, jsonOk } from "@/lib/api-response";
 import { getReviewContext } from "@/lib/services/review-actions";
+import { jsonInternalError } from "@/lib/api/handle-route-error";
+import {
+  isSessionResponse,
+  requireApiSession,
+} from "@/lib/api/require-api-session";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
 export async function GET(_request: Request, context: RouteContext) {
+  const session = await requireApiSession();
+  if (isSessionResponse(session)) return session;
   try {
     const { id } = await context.params;
     const review = await getReviewContext(id);
@@ -18,8 +25,6 @@ export async function GET(_request: Request, context: RouteContext) {
       draftReport: review.version.draftReport,
     });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to load review context.";
-    return jsonError(message, 500);
+    return jsonInternalError(error, "coi.[id].review");
   }
 }

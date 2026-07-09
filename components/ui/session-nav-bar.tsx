@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, type Transition } from "framer-motion";
 import {
   ChevronsUpDown,
@@ -78,10 +78,14 @@ function NavLink({
   item,
   pathname,
   isCollapsed,
+  isNavigating,
+  onNavigate,
 }: {
   item: NavItem;
   pathname: string;
   isCollapsed: boolean;
+  isNavigating: boolean;
+  onNavigate: (href: string) => void;
 }) {
   const Icon = item.icon;
   const active = item.enabled && isActivePath(pathname, item.href);
@@ -89,6 +93,7 @@ function NavLink({
   const className = cn(
     "flex h-8 w-full flex-row items-center rounded-md px-2 py-1.5 transition hover:bg-muted hover:text-primary",
     active && "bg-muted text-primary",
+    isNavigating && "animate-pulse opacity-80",
     !item.enabled && "cursor-not-allowed opacity-50 hover:bg-transparent hover:text-muted-foreground"
   );
 
@@ -122,7 +127,12 @@ function NavLink({
   }
 
   return (
-    <Link href={item.href} className={className}>
+    <Link
+      href={item.href}
+      className={className}
+      onClick={() => onNavigate(item.href)}
+      aria-busy={isNavigating || undefined}
+    >
       {content}
     </Link>
   );
@@ -134,8 +144,13 @@ export interface SessionNavBarProps {
 
 export function SessionNavBar({ userEmail }: SessionNavBarProps) {
   const [isCollapsed, setIsCollapsed] = useState(true);
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
   const pathname = usePathname();
   const initials = getInitials(userEmail);
+
+  useEffect(() => {
+    setPendingHref(null);
+  }, [pathname]);
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -220,6 +235,8 @@ export function SessionNavBar({ userEmail }: SessionNavBarProps) {
                             item={item}
                             pathname={pathname}
                             isCollapsed={isCollapsed}
+                            isNavigating={pendingHref === item.href}
+                            onNavigate={setPendingHref}
                           />
                         ))}
                         {index < dashboardNavigation.length - 1 ? (

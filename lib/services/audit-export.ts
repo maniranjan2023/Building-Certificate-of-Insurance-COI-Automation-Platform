@@ -95,21 +95,12 @@ export interface CoiAuditExport {
     draftReport: unknown;
     riskAnalysis: unknown;
   };
-  templatesSnapshot: Array<{
-    key: string;
-    name: string;
-    subject: string;
-    enabled: boolean;
-    updatedAt: string;
-  }>;
-  checklistSnapshot: Array<{
+  documentChecklistItems: Array<{
     id: string;
     requirement: string;
     expectedValue: string;
     mandatory: boolean;
     category: string;
-    enabled: boolean;
-    updatedAt: string;
   }>;
 }
 
@@ -145,14 +136,31 @@ export async function buildCoiAuditExport(
 
   if (!document) return null;
 
-  const [activityTimeline, templates, checklistItems] = await Promise.all([
+  const [activityTimeline] = await Promise.all([
     getDocumentActivityEvents(coiDocumentId),
-    prisma.emailTemplate.findMany({ orderBy: { key: "asc" } }),
-    prisma.checklistItem.findMany({ orderBy: { sortOrder: "asc" } }),
   ]);
 
   const version = document.version as VersionBundle | null;
   const expiration = version ? resolveExpirationDate(version) : null;
+
+  const checklistItemIds = new Set<string>();
+  const checklistResults = version?.checklistResults as
+    | { items?: Array<{ checklistItemId?: string }> }
+    | null
+    | undefined;
+  for (const item of checklistResults?.items ?? []) {
+    if (item.checklistItemId) {
+      checklistItemIds.add(item.checklistItemId);
+    }
+  }
+
+  const documentChecklistItems =
+    checklistItemIds.size > 0
+      ? await prisma.checklistItem.findMany({
+          where: { id: { in: [...checklistItemIds] } },
+          orderBy: { sortOrder: "asc" },
+        })
+      : [];
 
   return {
     exportedAt: new Date().toISOString(),
@@ -160,7 +168,7 @@ export async function buildCoiAuditExport(
     document: {
       id: document.id,
       fileName: document.fileName,
-      cloudinaryUrl: document.cloudinaryUrl,
+      cloudinaryUrl: "[redacted — use authenticated asset API]",
       mimeType: document.mimeType,
       fileSizeBytes: document.fileSizeBytes,
       intakeSource: document.intakeSource,
@@ -189,7 +197,7 @@ export async function buildCoiAuditExport(
         }
       : null,
     immutableFile: {
-      cloudinaryUrl: document.cloudinaryUrl,
+      cloudinaryUrl: "[redacted — use authenticated asset API]",
       cloudinaryPublicId: document.cloudinaryPublicId,
       storedAt: document.createdAt.toISOString(),
       note: "Original upload stored immutably in Cloudinary at intake time.",
@@ -250,21 +258,12 @@ export async function buildCoiAuditExport(
       draftReport: version?.draftReport ?? null,
       riskAnalysis: version?.riskAnalysis ?? null,
     },
-    templatesSnapshot: templates.map((template) => ({
-      key: template.key,
-      name: template.name,
-      subject: template.subject,
-      enabled: template.enabled,
-      updatedAt: template.updatedAt.toISOString(),
-    })),
-    checklistSnapshot: checklistItems.map((item) => ({
+    documentChecklistItems: documentChecklistItems.map((item) => ({
       id: item.id,
       requirement: item.requirement,
       expectedValue: item.expectedValue,
       mandatory: item.mandatory,
       category: item.category,
-      enabled: item.enabled,
-      updatedAt: item.updatedAt.toISOString(),
     })),
   };
 }

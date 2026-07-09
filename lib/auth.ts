@@ -1,28 +1,43 @@
-import { SignJWT, jwtVerify } from "jose";
+import { randomUUID } from "crypto";
+import { decodeJwt } from "jose";
 import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
 import { getEnv } from "@/lib/env";
+import {
+  AUTH_COOKIE_NAME,
+  type AdminSession,
+  createSessionToken as signSessionToken,
+  getSessionCookieOptions,
+  verifySessionToken as verifySessionTokenJwt,
+} from "@/lib/auth-jwt";
+import { isSessionRevoked } from "@/lib/security/session-revocation";
 
-export const AUTH_COOKIE_NAME = "coi_session";
-const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7; // 7 days
-
-export interface AdminSession {
-  email: string;
-  role: "admin";
-}
-
-function getJwtSecret(): Uint8Array {
-  return new TextEncoder().encode(getEnv().JWT_SECRET);
-}
+export {
+  AUTH_COOKIE_NAME,
+  type AdminSession,
+  getSessionCookieOptions,
+};
 
 export async function verifyAdminCredentials(
   email: string,
   password: string
 ): Promise<boolean> {
+  if (!password || typeof password !== "string") {
+    return false;
+  }
+
   const env = getEnv();
 
   if (email.toLowerCase() !== env.ADMIN_EMAIL.toLowerCase()) {
     return false;
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    const hash = env.ADMIN_PASSWORD_HASH;
+    if (!hash || typeof hash !== "string") {
+      return false;
+    }
+    return bcrypt.compare(password, hash);
   }
 
   if (env.ADMIN_PASSWORD_HASH) {
@@ -35,25 +50,31 @@ export async function verifyAdminCredentials(
 export async function createSessionToken(
   session: AdminSession
 ): Promise<string> {
-  return new SignJWT({ ...session })
-    .setProtectedHeader({ alg: "HS256" })
-    .setIssuedAt()
-    .setExpirationTime(`${SESSION_MAX_AGE_SECONDS}s`)
-    .sign(getJwtSecret());
+  return signSessionToken(session, randomUUID());
 }
 
 export async function verifySessionToken(
   token: string
 ): Promise<AdminSession | null> {
+  const session = await verifySessionTokenJwt(token);
+  if (!session) {
+    return null;
+  }
+
   try {
-    const { payload } = await jwtVerify(token, getJwtSecret());
-    if (payload.role !== "admin" || typeof payload.email !== "string") {
+    const payload = decodeJwt(token);
+    if (
+      await isSessionRevoked(
+        typeof payload.jti === "string" ? payload.jti : undefined
+      )
+    ) {
       return null;
     }
-    return { email: payload.email, role: "admin" };
   } catch {
     return null;
   }
+
+  return session;
 }
 
 export async function getSession(): Promise<AdminSession | null> {
@@ -63,16 +84,6 @@ export async function getSession(): Promise<AdminSession | null> {
     return null;
   }
   return verifySessionToken(token);
-}
-
-export function getSessionCookieOptions(maxAge = SESSION_MAX_AGE_SECONDS) {
-  return {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax" as const,
-    path: "/",
-    maxAge,
-  };
 }
 
 export async function requireSession(): Promise<AdminSession> {

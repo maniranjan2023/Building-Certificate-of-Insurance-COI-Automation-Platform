@@ -5,6 +5,7 @@ import { getCoiDocumentById } from "@/lib/services/coi";
 import { COI_STATUS_LABELS } from "@/lib/services/version-labels";
 import { getVersionByDocumentId } from "@/lib/services/version";
 import { formatDate } from "@/lib/utils";
+import { coiAssetApiPath, coiPdfApiPath } from "@/lib/coi-asset-path";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { VersionBadge } from "@/components/ui/version-badge";
 import { Button } from "@/components/ui/button";
@@ -89,14 +90,14 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
               <CardContent className="px-4 pb-4">
                 {isPdf ? (
                   <iframe
-                    src={doc.cloudinaryUrl}
+                    src={coiPdfApiPath(doc.id)}
                     title={doc.fileName}
                     className="h-[60vh] w-full rounded-lg border bg-muted"
                   />
                 ) : (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={doc.cloudinaryUrl}
+                    src={coiAssetApiPath(doc.id)}
                     alt={doc.fileName}
                     className="max-h-[60vh] w-full rounded-lg border object-contain bg-muted"
                   />

@@ -1,11 +1,18 @@
 import { jsonError, jsonOk } from "@/lib/api-response";
 import { getTenantActivityBySenderId } from "@/lib/services/tenant-activity";
+import { jsonInternalError } from "@/lib/api/handle-route-error";
+import {
+  isSessionResponse,
+  requireApiSession,
+} from "@/lib/api/require-api-session";
 
 interface RouteParams {
   params: Promise<{ senderId: string }>;
 }
 
 export async function GET(_request: Request, { params }: RouteParams) {
+  const session = await requireApiSession();
+  if (isSessionResponse(session)) return session;
   try {
     const { senderId } = await params;
     const activity = await getTenantActivityBySenderId(senderId);
@@ -16,8 +23,6 @@ export async function GET(_request: Request, { params }: RouteParams) {
 
     return jsonOk(activity);
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to load tenant activity.";
-    return jsonError(message, 500);
+    return jsonInternalError(error, "tenants.[senderId].activity");
   }
 }

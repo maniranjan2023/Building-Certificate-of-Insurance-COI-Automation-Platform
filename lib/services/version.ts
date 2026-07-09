@@ -117,9 +117,9 @@ export async function updateVersionStatus(
   status: CoiStatus,
   rejectionReason?: string | null
 ) {
-  if (status === CoiStatus.REJECTED && !rejectionReason?.trim()) {
+  if (status === CoiStatus.ACCEPTED || status === CoiStatus.REJECTED) {
     throw new VersionValidationError(
-      "A rejection reason is required when marking a version as rejected."
+      "ACCEPTED and REJECTED statuses must use the dedicated accept/reject routes."
     );
   }
 
@@ -127,8 +127,7 @@ export async function updateVersionStatus(
     where: { id: versionId },
     data: {
       status,
-      rejectionReason:
-        status === CoiStatus.REJECTED ? rejectionReason?.trim() ?? null : null,
+      rejectionReason: null,
     },
     include: {
       sender: true,

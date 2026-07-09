@@ -17,6 +17,7 @@ import { VersionBadge } from "@/components/ui/version-badge";
 import { Button } from "@/components/ui/button";
 import { CoiDeleteButton } from "@/components/coi/coi-delete-button";
 import { AuditExportButton } from "@/components/coi/audit-export-button";
+import { coiAssetApiPath } from "@/lib/coi-asset-path";
 
 interface CoiDetailHeaderProps {
   documentId: string;
@@ -25,7 +26,6 @@ interface CoiDetailHeaderProps {
   fileSizeBytes: number;
   mimeType: string;
   intakeSource: IntakeSource;
-  cloudinaryUrl: string;
   senderEmail: string | null;
   senderId: string | null;
   versionNumber: number | null;
@@ -41,7 +41,6 @@ export function CoiDetailHeader({
   fileSizeBytes,
   mimeType,
   intakeSource,
-  cloudinaryUrl,
   senderEmail,
   senderId,
   versionNumber,
@@ -142,7 +141,7 @@ export function CoiDetailHeader({
 
             <div className="flex flex-wrap gap-2">
               <Button asChild size="sm" variant="outline">
-                <a href={cloudinaryUrl} target="_blank" rel="noopener noreferrer">
+                <a href={coiAssetApiPath(documentId)} target="_blank" rel="noopener noreferrer">
                   <ExternalLink className="size-3.5" />
                   Open file
                 </a>

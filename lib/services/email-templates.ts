@@ -11,6 +11,7 @@ import {
   extractGuardrailCitationsFromDraft,
   formatGuardrailCitationsForEmail,
 } from "@/lib/services/guardrail-email";
+import { sanitizeTemplateVariable } from "@/lib/security/template-sanitize";
 
 export class EmailTemplateValidationError extends Error {
   constructor(message: string) {
@@ -71,17 +72,12 @@ Thank you.`,
   },
   guardrail_blocked: {
     name: EMAIL_TEMPLATE_LABELS.guardrail_blocked,
-    subject: "COI submission — security review required ({{version_number}})",
+    subject: "COI submission — additional review required ({{version_number}})",
     body: `Hello {{sender_name}},
 
-We received your Certificate of Insurance ({{version_number}}), but our automated security review could not complete processing.
+We received your Certificate of Insurance ({{version_number}}), but our automated review could not complete processing.
 
 {{guardrail_summary}}
-
-Detected issues (citations from our review agents):
-{{guardrail_citations}}
-
-Pipeline step: {{agent_step}}
 
 Please submit a standard ACORD 25 certificate without embedded instructions, prompts, or non-insurance text. If you believe this is an error, reply to this message with a corrected PDF.
 
@@ -286,26 +282,42 @@ export function buildTemplateVariables(options: {
   const primaryGuardrail = guardrailCitations[0];
 
   return {
-    sender_name: greetingName,
-    sender_email: options.senderEmail,
-    property_name: options.propertyName ?? signatory.property_name,
-    expiry_date: extraction?.expirationDate ?? "Not listed",
-    policy_number: extraction?.policyNumber ?? "Not listed",
-    carrier_name: extraction?.carrierName ?? "Not listed",
-    missing_items: missingItems.map((i) => `• ${i}`).join("\n") || "None listed",
-    matched_items: matchedItems.map((i) => `• ${i}`).join("\n") || "None listed",
-    rejection_reason: options.rejectionReason?.trim() ?? "",
-    version_number: `v${options.version.versionNumber}`,
-    submission_date: options.version.createdAt.toISOString().slice(0, 10),
-    ai_summary: report?.summary ?? "No summary available.",
-    guardrail_citations: guardrailCitationsText,
-    guardrail_summary:
+    sender_name: sanitizeTemplateVariable(greetingName, 120),
+    sender_email: sanitizeTemplateVariable(options.senderEmail, 200),
+    property_name: sanitizeTemplateVariable(
+      options.propertyName ?? signatory.property_name,
+      200
+    ),
+    expiry_date: sanitizeTemplateVariable(extraction?.expirationDate ?? "Not listed", 80),
+    policy_number: sanitizeTemplateVariable(extraction?.policyNumber ?? "Not listed", 120),
+    carrier_name: sanitizeTemplateVariable(extraction?.carrierName ?? "Not listed", 200),
+    missing_items:
+      sanitizeTemplateVariable(
+        missingItems.map((i) => `• ${i}`).join("\n") || "None listed",
+        2000
+      ),
+    matched_items:
+      sanitizeTemplateVariable(
+        matchedItems.map((i) => `• ${i}`).join("\n") || "None listed",
+        2000
+      ),
+    rejection_reason: sanitizeTemplateVariable(options.rejectionReason?.trim() ?? "", 500),
+    version_number: sanitizeTemplateVariable(`v${options.version.versionNumber}`, 40),
+    submission_date: sanitizeTemplateVariable(
+      options.version.createdAt.toISOString().slice(0, 10),
+      40
+    ),
+    ai_summary: sanitizeTemplateVariable(report?.summary ?? "No summary available.", 1500),
+    guardrail_citations: sanitizeTemplateVariable(guardrailCitationsText, 1500),
+    guardrail_summary: sanitizeTemplateVariable(
       (report as { guardrailBlock?: { tenantSummary?: string } } | null)?.guardrailBlock
         ?.tenantSummary ??
-      primaryGuardrail?.citation ??
-      report?.summary ??
-      "Automated security review blocked processing.",
-    agent_step: primaryGuardrail?.agentName ?? "document review",
+        primaryGuardrail?.citation ??
+        report?.summary ??
+        "Automated security review blocked processing.",
+      1500
+    ),
+    agent_step: sanitizeTemplateVariable(primaryGuardrail?.agentName ?? "document review", 120),
     signatory_name: signatory.signatory_name,
     signatory_title: signatory.signatory_title,
     company_name: signatory.company_name,

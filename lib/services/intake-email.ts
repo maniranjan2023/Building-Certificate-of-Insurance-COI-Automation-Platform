@@ -4,6 +4,7 @@ import {
   renderAutoIntakeTemplate,
   type TemplateRenderContext,
 } from "@/lib/services/intake-email-templates";
+import { validateOutboundEmailContent } from "@/lib/services/admin-outbound-guardrail";
 import { deliverOutboundEmail } from "@/lib/services/outbound-deliver";
 
 export type { AutoEmailTemplate, TemplateRenderContext };
@@ -19,6 +20,11 @@ export async function sendAutoIntakeEmail(options: {
   const rendered = renderAutoIntakeTemplate(options.template, {
     senderEmail: options.to,
     ...options.context,
+  });
+
+  await validateOutboundEmailContent({
+    subject: rendered.subject,
+    body: rendered.text,
   });
 
   await deliverOutboundEmail({

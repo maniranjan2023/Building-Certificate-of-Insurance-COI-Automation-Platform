@@ -18,6 +18,7 @@ import { IntakeSourceBadge } from "@/components/ui/intake-source-badge";
 import { JobStatusBadge } from "@/components/ui/job-status-badge";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { VersionBadge } from "@/components/ui/version-badge";
+import { coiAssetApiPath } from "@/lib/coi-asset-path";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -234,7 +235,7 @@ export function CoiPortfolio({ documents }: CoiPortfolioProps) {
                     </Button>
                     <Button asChild variant="outline" size="sm">
                       <a
-                        href={document.cloudinaryUrl}
+                        href={coiAssetApiPath(document.id)}
                         target="_blank"
                         rel="noopener noreferrer"
                       >

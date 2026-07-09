@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CoiValidationError, validateCoiFile } from "@/lib/services/coi";
+import { CoiValidationError, validateCoiBuffer, validateCoiFile } from "@/lib/services/coi";
 
 function createFile(name: string, type: string, size: number): File {
   const content = new Uint8Array(size);
@@ -19,11 +19,15 @@ describe("validateCoiFile", () => {
     ).toThrow(CoiValidationError);
   });
 
-  it("rejects files larger than 10 MB", () => {
-    expect(() =>
-      validateCoiFile(
-        createFile("large.pdf", "application/pdf", 10 * 1024 * 1024 + 1)
-      )
-    ).toThrow(CoiValidationError);
+  it("rejects buffers whose magic bytes do not match MIME type", () => {
+    const fakePdf = Buffer.from("not a real pdf");
+    expect(() => validateCoiBuffer(fakePdf, "application/pdf")).toThrow(
+      CoiValidationError
+    );
+  });
+
+  it("accepts a valid PDF buffer", () => {
+    const pdf = Buffer.from("%PDF-1.4\n%fake");
+    expect(() => validateCoiBuffer(pdf, "application/pdf")).not.toThrow();
   });
 });

@@ -4,6 +4,10 @@ import {
   CHECKLIST_CATEGORIES,
   DEFAULT_CHECKLIST_ITEMS,
 } from "@/lib/constants/checklist-categories";
+import {
+  ChecklistSecurityError,
+  validateChecklistFieldSecurity,
+} from "@/lib/security/checklist-sanitize";
 
 export class ChecklistValidationError extends Error {
   constructor(message: string) {
@@ -29,11 +33,14 @@ function validateCategory(category: string): void {
 }
 
 function validateItemInput(input: ChecklistItemInput): void {
-  if (!input.requirement.trim()) {
-    throw new ChecklistValidationError("Requirement is required.");
-  }
-  if (!input.expectedValue.trim()) {
-    throw new ChecklistValidationError("Expected value is required.");
+  try {
+    validateChecklistFieldSecurity("Requirement", input.requirement);
+    validateChecklistFieldSecurity("Expected value", input.expectedValue);
+  } catch (error) {
+    if (error instanceof ChecklistSecurityError) {
+      throw new ChecklistValidationError(error.message);
+    }
+    throw error;
   }
   validateCategory(input.category);
 }
@@ -114,8 +121,11 @@ export async function createChecklistItem(
 
   return prisma.checklistItem.create({
     data: {
-      requirement: input.requirement.trim(),
-      expectedValue: input.expectedValue.trim(),
+      requirement: validateChecklistFieldSecurity("Requirement", input.requirement),
+      expectedValue: validateChecklistFieldSecurity(
+        "Expected value",
+        input.expectedValue
+      ),
       mandatory: input.mandatory ?? true,
       category: input.category,
       sortOrder: input.sortOrder ?? (maxSort._max.sortOrder ?? 0) + 1,
@@ -145,8 +155,11 @@ export async function updateChecklistItem(
   return prisma.checklistItem.update({
     where: { id },
     data: {
-      requirement: merged.requirement.trim(),
-      expectedValue: merged.expectedValue.trim(),
+      requirement: validateChecklistFieldSecurity("Requirement", merged.requirement),
+      expectedValue: validateChecklistFieldSecurity(
+        "Expected value",
+        merged.expectedValue
+      ),
       mandatory: merged.mandatory,
       category: merged.category,
       sortOrder: merged.sortOrder,

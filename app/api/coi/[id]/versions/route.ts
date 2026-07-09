@@ -5,24 +5,31 @@ import {
 import { listVersionsForDocument } from "@/lib/services/version";
 import { CloudinaryUploadError } from "@/lib/services/cloudinary";
 import { jsonError, jsonOk } from "@/lib/api-response";
+import { jsonInternalError } from "@/lib/api/handle-route-error";
+import {
+  isSessionResponse,
+  requireApiSession,
+} from "@/lib/api/require-api-session";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
 export async function GET(_request: Request, context: RouteContext) {
+  const session = await requireApiSession();
+  if (isSessionResponse(session)) return session;
   try {
     const { id } = await context.params;
     const versions = await listVersionsForDocument(id);
     return jsonOk(versions);
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to load version history.";
-    return jsonError(message, 500);
+    return jsonInternalError(error, "coi.[id].versions");
   }
 }
 
 export async function POST(request: Request, context: RouteContext) {
+  const session = await requireApiSession();
+  if (isSessionResponse(session)) return session;
   try {
     const { id } = await context.params;
     const formData = await request.formData();
@@ -56,8 +63,6 @@ export async function POST(request: Request, context: RouteContext) {
     if (error instanceof CloudinaryUploadError) {
       return jsonError(error.message, 502);
     }
-    const message =
-      error instanceof Error ? error.message : "Failed to create new version.";
-    return jsonError(message, 500);
+    return jsonInternalError(error, "coi.[id].versions");
   }
 }

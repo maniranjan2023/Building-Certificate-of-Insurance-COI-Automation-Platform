@@ -1,11 +1,18 @@
 import { getCoiDocumentById, deleteCoiDocumentById, CoiNotFoundError } from "@/lib/services/coi";
 import { jsonError, jsonOk } from "@/lib/api-response";
+import { jsonInternalError } from "@/lib/api/handle-route-error";
+import {
+  isSessionResponse,
+  requireApiSession,
+} from "@/lib/api/require-api-session";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
 export async function GET(_request: Request, context: RouteContext) {
+  const session = await requireApiSession();
+  if (isSessionResponse(session)) return session;
   try {
     const { id } = await context.params;
     const document = await getCoiDocumentById(id);
@@ -16,13 +23,13 @@ export async function GET(_request: Request, context: RouteContext) {
 
     return jsonOk(document);
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to load COI document.";
-    return jsonError(message, 500);
+    return jsonInternalError(error, "coi.[id]");
   }
 }
 
 export async function DELETE(_request: Request, context: RouteContext) {
+  const session = await requireApiSession();
+  if (isSessionResponse(session)) return session;
   try {
     const { id } = await context.params;
     await deleteCoiDocumentById(id);
@@ -31,8 +38,6 @@ export async function DELETE(_request: Request, context: RouteContext) {
     if (error instanceof CoiNotFoundError) {
       return jsonError(error.message, 404);
     }
-    const message =
-      error instanceof Error ? error.message : "Failed to delete COI document.";
-    return jsonError(message, 500);
+    return jsonInternalError(error, "coi.[id]");
   }
 }

@@ -3,6 +3,11 @@ import { jsonError, jsonOk } from "@/lib/api-response";
 import { AdminOutboundGuardrailError } from "@/lib/services/admin-outbound-guardrail";
 import { rejectCoiVersion, ReviewActionError } from "@/lib/services/review-actions";
 import { VersionValidationError } from "@/lib/services/version";
+import { jsonInternalError } from "@/lib/api/handle-route-error";
+import {
+  isSessionResponse,
+  requireApiSession,
+} from "@/lib/api/require-api-session";
 
 const bodySchema = z.object({
   rejectionReason: z.string().min(1, "Rejection reason is required."),
@@ -14,6 +19,8 @@ interface RouteContext {
 }
 
 export async function POST(request: Request, context: RouteContext) {
+  const session = await requireApiSession();
+  if (isSessionResponse(session)) return session;
   try {
     const { id } = await context.params;
     const body = bodySchema.parse(await request.json());
@@ -31,8 +38,6 @@ export async function POST(request: Request, context: RouteContext) {
     if (error instanceof z.ZodError) {
       return jsonError(error.issues[0]?.message ?? "Invalid request.", 400);
     }
-    const message =
-      error instanceof Error ? error.message : "Failed to reject COI.";
-    return jsonError(message, 500);
+    return jsonInternalError(error, "coi.[id].reject");
   }
 }

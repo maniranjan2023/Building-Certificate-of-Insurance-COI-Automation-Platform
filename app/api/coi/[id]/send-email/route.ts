@@ -2,6 +2,11 @@ import { z } from "zod";
 import { isEmailTemplateKey } from "@/lib/constants/email-templates";
 import { jsonError, jsonOk } from "@/lib/api-response";
 import { AdminOutboundGuardrailError } from "@/lib/services/admin-outbound-guardrail";
+import { jsonInternalError } from "@/lib/api/handle-route-error";
+import {
+  isSessionResponse,
+  requireApiSession,
+} from "@/lib/api/require-api-session";
 import {
   ReviewActionError,
   sendSuggestedComplianceEmail,
@@ -17,6 +22,8 @@ interface RouteContext {
 }
 
 export async function POST(request: Request, context: RouteContext) {
+  const session = await requireApiSession();
+  if (isSessionResponse(session)) return session;
   try {
     const { id } = await context.params;
     const body = bodySchema.parse(await request.json().catch(() => ({})));
@@ -37,8 +44,6 @@ export async function POST(request: Request, context: RouteContext) {
     if (error instanceof z.ZodError) {
       return jsonError(error.issues[0]?.message ?? "Invalid request.", 400);
     }
-    const message =
-      error instanceof Error ? error.message : "Failed to send email.";
-    return jsonError(message, 500);
+    return jsonInternalError(error, "coi.[id].send-email");
   }
 }

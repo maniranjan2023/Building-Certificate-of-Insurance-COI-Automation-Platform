@@ -1,4 +1,5 @@
 import os
+import sys
 import threading
 import time
 import traceback
@@ -439,35 +440,11 @@ def process_email(message):
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
-
-    payload = request.json or {}
-
-    event = payload.get("event_type") or payload.get("type")
-    print(f"Webhook received: {event}")
-
-    if event != "message.received":
-        return Response(status=200)
-
-    message = payload.get("message", {})
-
-    message_id = message.get("message_id")
-
-    if not message_id:
-        print("Webhook missing message_id")
-        return Response(status=200)
-
-    if message_id in processed_messages:
-        return Response(status=200)
-
-    processed_messages.add(message_id)
-
-    threading.Thread(
-        target=process_email,
-        args=(message,),
-        daemon=True
-    ).start()
-
-    return Response(status=200)
+    """
+    Deprecated — use the Next.js route POST /api/webhooks/agentmail instead.
+    This legacy endpoint is disabled to prevent unauthenticated duplicate intake.
+    """
+    return {"error": "Deprecated. Use /api/webhooks/agentmail on the Next.js app."}, 410
 
 
 # ----------------------------------------
@@ -475,6 +452,12 @@ def webhook():
 # ----------------------------------------
 
 if __name__ == "__main__":
+
+    if os.getenv("AGENT_PY_ENABLED", "").lower() not in ("1", "true", "yes"):
+        print(
+            "agent.py is disabled. Set AGENT_PY_ENABLED=true for local development only."
+        )
+        sys.exit(0)
 
     inbox = setup()
 

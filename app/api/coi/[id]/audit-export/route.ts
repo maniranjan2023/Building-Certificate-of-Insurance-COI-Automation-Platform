@@ -1,11 +1,18 @@
 import { buildCoiAuditExport } from "@/lib/services/audit-export";
 import { jsonError } from "@/lib/api-response";
+import { jsonInternalError } from "@/lib/api/handle-route-error";
+import {
+  isSessionResponse,
+  requireApiSession,
+} from "@/lib/api/require-api-session";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
 export async function GET(_request: Request, context: RouteContext) {
+  const session = await requireApiSession();
+  if (isSessionResponse(session)) return session;
   try {
     const { id } = await context.params;
     const audit = await buildCoiAuditExport(id);
@@ -24,8 +31,6 @@ export async function GET(_request: Request, context: RouteContext) {
       },
     });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to export audit log.";
-    return jsonError(message, 500);
+    return jsonInternalError(error, "coi.[id].audit-export");
   }
 }

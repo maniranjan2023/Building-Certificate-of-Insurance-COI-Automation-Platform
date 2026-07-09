@@ -1,5 +1,5 @@
 import { chatWithGroqFallback } from "@/lib/ai/groq-client";
-import { ruleBasedInjectionGuard, llmSafetyGuard } from "@/lib/ai/guardrails";
+import { ruleBasedInjectionGuard } from "@/lib/ai/guardrails";
 
 export class AdminOutboundGuardrailError extends Error {
   readonly reasons: string[];
@@ -40,8 +40,7 @@ function checkInternalLeaks(text: string): string | null {
   return null;
 }
 
-async function llmTenantEmailGuard(text: string): Promise<string | null> {
-  const sample = text.slice(0, 6000);
+async function llmTenantEmailGuardChunk(text: string): Promise<string | null> {
   const { content } = await chatWithGroqFallback({
     messages: [
       {
@@ -49,7 +48,7 @@ async function llmTenantEmailGuard(text: string): Promise<string | null> {
         content:
           'You review outbound tenant emails for a property COI compliance platform. Flag unsafe, abusive, off-topic, or clearly internal-only content. Reply JSON only: {"unsafe":boolean,"reason":string}',
       },
-      { role: "user", content: sample },
+      { role: "user", content: text },
     ],
     responseFormat: "json_object",
   });
@@ -59,8 +58,17 @@ async function llmTenantEmailGuard(text: string): Promise<string | null> {
     if (parsed.unsafe) {
       return parsed.reason ?? "Outbound email failed tenant safety review.";
     }
+    return null;
   } catch {
-    // Non-blocking parse failure — rule checks already ran
+    return "Outbound email safety review returned invalid JSON (fail closed).";
+  }
+}
+
+async function llmTenantEmailGuard(text: string): Promise<string | null> {
+  const chunkSize = 6000;
+  for (let offset = 0; offset < text.length; offset += chunkSize) {
+    const reason = await llmTenantEmailGuardChunk(text.slice(offset, offset + chunkSize));
+    if (reason) return reason;
   }
   return null;
 }
@@ -104,14 +112,9 @@ export async function validateOutboundEmailContent(
     checkInternalLeaks(subject) ?? checkInternalLeaks(body);
   if (leakIssue) reasons.push(leakIssue);
 
-  if (options.isAdminEdited && body.length > 0) {
+  if (body.length > 0) {
     const llmReason = await llmTenantEmailGuard(combined);
     if (llmReason) reasons.push(llmReason);
-  } else if (body.length > 400) {
-    const safety = await llmSafetyGuard(combined);
-    if (safety.tripwireTriggered) {
-      reasons.push(String(safety.outputInfo));
-    }
   }
 
   if (reasons.length > 0) {

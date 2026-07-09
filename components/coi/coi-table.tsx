@@ -11,6 +11,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { VersionBadge } from "@/components/ui/version-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { coiAssetApiPath } from "@/lib/coi-asset-path";
 
 interface CoiTableProps {
   documents: CoiSubmissionRow[];
@@ -112,7 +113,7 @@ export function CoiTable({ documents }: CoiTableProps) {
                       </Button>
                       <Button asChild variant="ghost" size="xs">
                         <a
-                          href={document.cloudinaryUrl}
+                          href={coiAssetApiPath(document.id)}
                           target="_blank"
                           rel="noopener noreferrer"
                         >

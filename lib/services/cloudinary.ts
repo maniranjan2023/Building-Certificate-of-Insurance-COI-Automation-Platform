@@ -44,7 +44,7 @@ function toUploadError(error: unknown): CloudinaryUploadError {
 
   if (httpCode === 403) {
     return new CloudinaryUploadError(
-      String(nestedMessage?? "").includes("permissions")
+      String(nestedMessage ?? "").includes("permissions")
         ? "Cloudinary API key is missing upload permission. In Cloudinary → Settings → API Keys, use the Root key or create a key with Upload enabled, then update .env and restart the dev server."
         : "Cloudinary rejected the upload (403). Check that your API key has Upload permission and matches CLOUDINARY_CLOUD_NAME."
     );
@@ -55,6 +55,55 @@ function toUploadError(error: unknown): CloudinaryUploadError {
   }
 
   return new CloudinaryUploadError("Cloudinary upload failed.");
+}
+
+export function getSignedCoiAssetUrl(
+  publicId: string,
+  options?: { resourceType?: "image" | "raw" | "video" | "auto" }
+): string {
+  configureCloudinary();
+  const resourceType = options?.resourceType ?? "auto";
+
+  return cloudinary.url(publicId, {
+    resource_type: resourceType,
+    type: "authenticated",
+    sign_url: true,
+    secure: true,
+  });
+}
+
+function inferLegacyResourceType(
+  storedUrl: string
+): "image" | "raw" | "video" | "auto" {
+  const match = storedUrl.match(/res\.cloudinary\.com\/[^/]+\/(image|raw|video)\//);
+  return (match?.[1] as "image" | "raw" | "video" | undefined) ?? "raw";
+}
+
+/** Legacy public uploads — signed URL preserving original resource type. */
+export function getSignedLegacyCoiAssetUrl(
+  publicId: string,
+  storedUrl?: string | null
+): string {
+  configureCloudinary();
+  const resourceType = storedUrl
+    ? inferLegacyResourceType(storedUrl)
+    : "raw";
+
+  return cloudinary.url(publicId, {
+    resource_type: resourceType,
+    sign_url: true,
+    secure: true,
+  });
+}
+
+export function resolveCoiAssetUrl(publicId: string, storedUrl?: string | null): string {
+  if (storedUrl?.includes("/authenticated/")) {
+    return getSignedCoiAssetUrl(publicId);
+  }
+  if (storedUrl?.includes("res.cloudinary.com")) {
+    return getSignedLegacyCoiAssetUrl(publicId, storedUrl);
+  }
+  return getSignedCoiAssetUrl(publicId);
 }
 
 export async function uploadCoiDocument(
@@ -84,6 +133,8 @@ export async function uploadCoiBuffer(
       {
         folder: uploadFolder,
         resource_type: "auto",
+        type: "authenticated",
+        access_mode: "authenticated",
         use_filename: true,
         unique_filename: true,
         overwrite: false,
@@ -105,7 +156,7 @@ export async function uploadCoiBuffer(
   });
 
   return {
-    url: result.secure_url,
+    url: getSignedCoiAssetUrl(result.public_id),
     publicId: result.public_id,
     bytes: result.bytes,
   };
@@ -113,5 +164,8 @@ export async function uploadCoiBuffer(
 
 export async function deleteCloudinaryAsset(publicId: string): Promise<void> {
   configureCloudinary();
-  await cloudinary.uploader.destroy(publicId, { resource_type: "auto" });
+  await cloudinary.uploader.destroy(publicId, {
+    resource_type: "auto",
+    type: "authenticated",
+  });
 }

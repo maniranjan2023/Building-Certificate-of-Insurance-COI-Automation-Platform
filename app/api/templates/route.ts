@@ -5,19 +5,26 @@ import {
 } from "@/lib/services/email-templates";
 import { EMAIL_TEMPLATE_KEYS } from "@/lib/constants/email-templates";
 import { renderEmailContent } from "@/lib/services/template-render";
+import { jsonInternalError } from "@/lib/api/handle-route-error";
+import {
+  isSessionResponse,
+  requireApiSession,
+} from "@/lib/api/require-api-session";
 
 export async function GET() {
+  const session = await requireApiSession();
+  if (isSessionResponse(session)) return session;
   try {
     const templates = await listEmailTemplates();
     return jsonOk(templates);
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to load templates.";
-    return jsonError(message, 500);
+    return jsonInternalError(error, "templates");
   }
 }
 
 export async function POST(request: Request) {
+  const session = await requireApiSession();
+  if (isSessionResponse(session)) return session;
   try {
     const body = z
       .object({
@@ -64,12 +71,12 @@ export async function POST(request: Request) {
     if (error instanceof z.ZodError) {
       return jsonError(error.issues[0]?.message ?? "Invalid request.", 400);
     }
-    const message =
-      error instanceof Error ? error.message : "Preview failed.";
-    return jsonError(message, 500);
+    return jsonInternalError(error, "templates");
   }
 }
 
 export async function PATCH(request: Request) {
+  const session = await requireApiSession();
+  if (isSessionResponse(session)) return session;
   return jsonError("Use PATCH /api/templates/[key] instead.", 405);
 }

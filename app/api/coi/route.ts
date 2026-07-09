@@ -5,19 +5,26 @@ import {
 } from "@/lib/services/coi";
 import { CloudinaryUploadError } from "@/lib/services/cloudinary";
 import { jsonError, jsonOk } from "@/lib/api-response";
+import { jsonInternalError } from "@/lib/api/handle-route-error";
+import {
+  isSessionResponse,
+  requireApiSession,
+} from "@/lib/api/require-api-session";
 
 export async function GET() {
+  const session = await requireApiSession();
+  if (isSessionResponse(session)) return session;
   try {
     const documents = await listCoiDocuments();
     return jsonOk(documents);
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to load COI documents.";
-    return jsonError(message, 500);
+    return jsonInternalError(error, "coi");
   }
 }
 
 export async function POST(request: Request) {
+  const session = await requireApiSession();
+  if (isSessionResponse(session)) return session;
   try {
     const formData = await request.formData();
     const file = formData.get("file");
@@ -44,9 +51,6 @@ export async function POST(request: Request) {
     if (error instanceof CloudinaryUploadError) {
       return jsonError(error.message, 502);
     }
-
-    const message =
-      error instanceof Error ? error.message : "Failed to upload COI.";
-    return jsonError(message, 500);
+    return jsonInternalError(error, "coi");
   }
 }

@@ -3,6 +3,7 @@ import {
   checklistItemsOutputGuardrail,
   coiInputGuardrailSet,
   reportMissingItemsOutputGuardrail,
+  suggestedEmailBodyOutputGuardrail,
   validateWithSchema,
   zodJsonOutputGuardrail,
 } from "@/lib/ai/guardrails";
@@ -27,6 +28,7 @@ import {
 import type { InputGuardrailDefinition, OutputGuardrailDefinition } from "@/lib/ai/agents-sdk";
 import type { ChecklistItem } from "@prisma/client";
 import type { z } from "zod";
+import { sanitizeChecklistPromptField } from "@/lib/security/checklist-sanitize";
 
 async function runJsonAgent<T>(options: {
   name: string;
@@ -38,7 +40,7 @@ async function runJsonAgent<T>(options: {
 }): Promise<{ data: T; raw: string; model: string }> {
   await executeInputGuardrails(
     options.input,
-    options.inputGuardrails ?? coiInputGuardrailSet({ includeLlmSafety: false })
+    options.inputGuardrails ?? coiInputGuardrailSet({ includeLlmSafety: true })
   );
 
   const systemPrompt = `${options.instructions}\n\nRespond with valid JSON only. No markdown fences.`;
@@ -91,7 +93,7 @@ All string fields must be plain strings (not nested objects). endorsements must 
 Return JSON with keys: carrierName, policyNumber, namedInsured, additionalInsured, certificateHolder, effectiveDate, expirationDate, generalLiabilityLimit, endorsements (array of strings).`,
     input: cleanText.slice(0, 100000),
     schema: extractionAgentOutputSchema,
-    inputGuardrails: coiInputGuardrailSet({ includeLlmSafety: false }),
+    inputGuardrails: coiInputGuardrailSet({ includeLlmSafety: true }),
   });
 
   return {
@@ -126,8 +128,8 @@ export async function runChecklistAgent(
     },
     checklist: checklist.map((item) => ({
       id: item.id,
-      requirement: item.requirement,
-      expectedValue: item.expectedValue,
+      requirement: sanitizeChecklistPromptField(item.requirement),
+      expectedValue: sanitizeChecklistPromptField(item.expectedValue),
       mandatory: item.mandatory,
       category: item.category,
     })),
@@ -150,7 +152,7 @@ Return JSON: { "items": [{ "checklistItemId", "label", "status", "evidence", "ma
 Set mandatoryFailures to the label (requirement text) of each mandatory item that is FAIL or MISSING. Set allPassed true only when every mandatory item has status PASS.`,
     input: payload,
     schema: checklistAgentOutputSchema,
-    inputGuardrails: coiInputGuardrailSet({ includeLlmSafety: false }),
+    inputGuardrails: coiInputGuardrailSet({ includeLlmSafety: true }),
     outputGuardrails: [checklistItemsOutputGuardrail(checklist.length)],
   });
 
@@ -189,7 +191,7 @@ Return JSON:
 - confidenceScore: number 0-1`,
     input: payload,
     schema: riskAgentOutputSchema,
-    inputGuardrails: coiInputGuardrailSet({ includeLlmSafety: false }),
+    inputGuardrails: coiInputGuardrailSet({ includeLlmSafety: true }),
   });
 
   return {
@@ -234,7 +236,10 @@ Return JSON: summary, recommendation (accept|reject|manual_review), recommendati
     input: payload,
     schema: reportAgentOutputSchema,
     inputGuardrails: coiInputGuardrailSet({ includeLlmSafety: true }),
-    outputGuardrails: [reportMissingItemsOutputGuardrail(allowedMissing)],
+    outputGuardrails: [
+      reportMissingItemsOutputGuardrail(allowedMissing),
+      suggestedEmailBodyOutputGuardrail(),
+    ],
   });
 
   return { ...result.data, raw: result.raw, model: result.model };

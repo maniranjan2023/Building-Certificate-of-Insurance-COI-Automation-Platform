@@ -7,6 +7,7 @@ import {
   type Sender,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { assertBufferMatchesMimeType } from "@/lib/security/file-magic";
 import { uploadCoiBuffer, uploadCoiDocument, deleteCloudinaryAsset } from "@/lib/services/cloudinary";
 import { removeCoiJobsFromQueues } from "@/lib/queue/coi-queue";
 import { createProcessCoiJob } from "@/lib/services/jobs";
@@ -83,6 +84,8 @@ export function validateCoiBuffer(buffer: Buffer, mimeType: string): void {
   if (buffer.byteLength === 0) {
     throw new CoiValidationError("File is empty.");
   }
+
+  assertBufferMatchesMimeType(buffer, mimeType);
 }
 
 function validateSenderEmail(email: string | null | undefined): string {
@@ -137,6 +140,8 @@ export async function createCoiFromUploadWithJob(
   senderEmail?: string | null
 ) {
   validateCoiFile(file);
+  const buffer = Buffer.from(await file.arrayBuffer());
+  validateCoiBuffer(buffer, file.type);
   const email = validateSenderEmail(senderEmail);
   const upload = await uploadCoiDocument(file);
   const document = await createCoiRecord(

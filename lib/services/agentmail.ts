@@ -95,6 +95,15 @@ export function pickCoiAttachment(
   return null;
 }
 
+export async function fetchVerifiedSenderEmail(
+  inboxId: string,
+  messageId: string
+): Promise<string | null> {
+  const agentMail = getClient();
+  const remote = await agentMail.inboxes.messages.get(inboxId, messageId);
+  return getMessageFromField(remote as AgentMailWebhookMessage);
+}
+
 export async function downloadAttachment(
   inboxId: string,
   messageId: string,

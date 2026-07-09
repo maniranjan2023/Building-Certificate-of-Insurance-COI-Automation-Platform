@@ -1,11 +1,18 @@
 import { jsonError, jsonOk } from "@/lib/api-response";
 import { getPipelineStatusForDocument } from "@/lib/services/pipeline-status";
+import { jsonInternalError } from "@/lib/api/handle-route-error";
+import {
+  isSessionResponse,
+  requireApiSession,
+} from "@/lib/api/require-api-session";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
 export async function GET(_request: Request, { params }: RouteParams) {
+  const session = await requireApiSession();
+  if (isSessionResponse(session)) return session;
   try {
     const { id } = await params;
     const status = await getPipelineStatusForDocument(id);
@@ -16,8 +23,6 @@ export async function GET(_request: Request, { params }: RouteParams) {
 
     return jsonOk(status);
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to load pipeline status.";
-    return jsonError(message, 500);
+    return jsonInternalError(error, "coi.[id].pipeline-status");
   }
 }

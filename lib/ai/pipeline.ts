@@ -29,6 +29,7 @@ import {
 } from "@/lib/services/ai-run";
 import { listChecklistItems } from "@/lib/services/checklist";
 import { prisma } from "@/lib/prisma";
+import { resolveCoiAssetUrl } from "@/lib/services/cloudinary";
 import { logError, logInfo, withSpan } from "@/lib/observability/logfire.node";
 
 async function downloadDocumentBuffer(url: string): Promise<Buffer> {
@@ -126,7 +127,11 @@ export async function runCoiAiPipeline(
       try {
         aiRun = await getOrCreateAiRun(data.coiJobId, versionId);
         await setAiRunCurrentStep(aiRun.id, "downloading");
-        const buffer = await downloadDocumentBuffer(document.cloudinaryUrl);
+        const assetUrl = resolveCoiAssetUrl(
+          document.cloudinaryPublicId,
+          document.cloudinaryUrl
+        );
+        const buffer = await downloadDocumentBuffer(assetUrl);
 
         const parsed = await runTimedStep(
           aiRun.id,

@@ -7,6 +7,12 @@ import {
   verifyAdminCredentials,
 } from "@/lib/auth";
 import { jsonError, jsonOk } from "@/lib/api-response";
+import {
+  LoginRateLimitError,
+  assertLoginAllowed,
+  clearLoginAttempts,
+  getClientIp,
+} from "@/lib/security/login-rate-limit";
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -22,6 +28,9 @@ export async function POST(request: Request) {
       return jsonError("Email and password are required.");
     }
 
+    const ip = getClientIp(request);
+    await assertLoginAllowed(ip, parsed.data.email);
+
     const isValid = await verifyAdminCredentials(
       parsed.data.email,
       parsed.data.password
@@ -30,6 +39,8 @@ export async function POST(request: Request) {
     if (!isValid) {
       return jsonError("Invalid email or password.", 401);
     }
+
+    await clearLoginAttempts(ip, parsed.data.email);
 
     const token = await createSessionToken({
       email: parsed.data.email,
@@ -41,6 +52,9 @@ export async function POST(request: Request) {
 
     return jsonOk({ email: parsed.data.email });
   } catch (error) {
+    if (error instanceof LoginRateLimitError) {
+      return jsonError(error.message, 429);
+    }
     const message =
       error instanceof Error ? error.message : "Unable to sign in.";
     return jsonError(message, 500);

@@ -1,13 +1,18 @@
 import { listCoiJobs } from "@/lib/services/jobs";
 import { jsonError, jsonOk } from "@/lib/api-response";
+import { jsonInternalError } from "@/lib/api/handle-route-error";
+import {
+  isSessionResponse,
+  requireApiSession,
+} from "@/lib/api/require-api-session";
 
 export async function GET() {
+  const session = await requireApiSession();
+  if (isSessionResponse(session)) return session;
   try {
     const jobs = await listCoiJobs();
     return jsonOk(jobs);
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to load jobs.";
-    return jsonError(message, 500);
+    return jsonInternalError(error, "jobs");
   }
 }

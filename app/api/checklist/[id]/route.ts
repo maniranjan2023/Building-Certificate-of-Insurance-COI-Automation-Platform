@@ -6,6 +6,11 @@ import {
   updateChecklistItem,
 } from "@/lib/services/checklist";
 import { jsonError, jsonOk } from "@/lib/api-response";
+import { jsonInternalError } from "@/lib/api/handle-route-error";
+import {
+  isSessionResponse,
+  requireApiSession,
+} from "@/lib/api/require-api-session";
 
 const updateSchema = z.object({
   requirement: z.string().min(1).optional(),
@@ -21,6 +26,8 @@ interface RouteContext {
 }
 
 export async function GET(_request: Request, context: RouteContext) {
+  const session = await requireApiSession();
+  if (isSessionResponse(session)) return session;
   try {
     const { id } = await context.params;
     const item = await getChecklistItemById(id);
@@ -29,13 +36,13 @@ export async function GET(_request: Request, context: RouteContext) {
     }
     return jsonOk(item);
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to load checklist item.";
-    return jsonError(message, 500);
+    return jsonInternalError(error, "checklist.[id]");
   }
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
+  const session = await requireApiSession();
+  if (isSessionResponse(session)) return session;
   try {
     const { id } = await context.params;
     const body = updateSchema.parse(await request.json());
@@ -48,13 +55,13 @@ export async function PATCH(request: Request, context: RouteContext) {
     if (error instanceof z.ZodError) {
       return jsonError(error.issues[0]?.message ?? "Invalid request.", 400);
     }
-    const message =
-      error instanceof Error ? error.message : "Failed to update checklist item.";
-    return jsonError(message, 500);
+    return jsonInternalError(error, "checklist.[id]");
   }
 }
 
 export async function DELETE(_request: Request, context: RouteContext) {
+  const session = await requireApiSession();
+  if (isSessionResponse(session)) return session;
   try {
     const { id } = await context.params;
     const item = await deleteChecklistItem(id);
@@ -63,8 +70,6 @@ export async function DELETE(_request: Request, context: RouteContext) {
     if (error instanceof ChecklistValidationError) {
       return jsonError(error.message, 400);
     }
-    const message =
-      error instanceof Error ? error.message : "Failed to delete checklist item.";
-    return jsonError(message, 500);
+    return jsonInternalError(error, "checklist.[id]");
   }
 }

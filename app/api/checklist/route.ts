@@ -5,6 +5,11 @@ import {
   listChecklistItems,
 } from "@/lib/services/checklist";
 import { jsonError, jsonOk } from "@/lib/api-response";
+import { jsonInternalError } from "@/lib/api/handle-route-error";
+import {
+  isSessionResponse,
+  requireApiSession,
+} from "@/lib/api/require-api-session";
 
 const createSchema = z.object({
   requirement: z.string().min(1),
@@ -15,17 +20,19 @@ const createSchema = z.object({
 });
 
 export async function GET() {
+  const session = await requireApiSession();
+  if (isSessionResponse(session)) return session;
   try {
     const items = await listChecklistItems(true);
     return jsonOk(items);
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to load checklist.";
-    return jsonError(message, 500);
+    return jsonInternalError(error, "checklist");
   }
 }
 
 export async function POST(request: Request) {
+  const session = await requireApiSession();
+  if (isSessionResponse(session)) return session;
   try {
     const body = createSchema.parse(await request.json());
     const item = await createChecklistItem(body);
@@ -37,8 +44,6 @@ export async function POST(request: Request) {
     if (error instanceof z.ZodError) {
       return jsonError(error.issues[0]?.message ?? "Invalid request.", 400);
     }
-    const message =
-      error instanceof Error ? error.message : "Failed to create checklist item.";
-    return jsonError(message, 500);
+    return jsonInternalError(error, "checklist");
   }
 }

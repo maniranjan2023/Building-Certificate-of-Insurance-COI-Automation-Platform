@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Geist_Mono } from "next/font/google";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppToastProvider } from "@/components/providers/app-toast-provider";
+import { BoneyardProvider } from "@/components/providers/boneyard-provider";
+import "../bones/registry";
 import "./globals.css";
 
 const geistMono = Geist_Mono({
@@ -28,7 +30,9 @@ export default function RootLayout({
     >
       <body className="font-mono antialiased" suppressHydrationWarning>
         <AppToastProvider>
-          <TooltipProvider>{children}</TooltipProvider>
+          <BoneyardProvider>
+            <TooltipProvider>{children}</TooltipProvider>
+          </BoneyardProvider>
         </AppToastProvider>
       </body>
     </html>

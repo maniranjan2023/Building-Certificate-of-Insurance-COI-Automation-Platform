@@ -40,6 +40,12 @@ const envSchema = z.object({
 
   AGENTMAIL_API_KEY: z.string().optional(),
 
+  /** Shared secret for AgentMail webhook authentication (Bearer or X-AgentMail-Webhook-Secret). */
+  AGENTMAIL_WEBHOOK_SECRET: z.string().optional(),
+
+  /** Bearer token for unauthenticated health probes (optional in development). */
+  HEALTH_CHECK_SECRET: z.string().optional(),
+
   INBOX_ID: z.string().default("maniranjan@agentmail.to"),
 
   WORKER_FORCE_FAIL: z.string().optional(),
@@ -92,6 +98,34 @@ const envSchema = z.object({
 
   /** Domain only — optional documentation for ngrok / webhook setup. */
   WEBHOOK_DOMAIN: z.string().optional(),
+
+  /** Admin login brute-force protection */
+  LOGIN_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(5),
+  LOGIN_RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().int().min(60).default(900),
+
+  /** JWT session lifetime (seconds) */
+  SESSION_MAX_AGE_SECONDS: z.coerce.number().int().min(3600).default(86400),
+
+  /** DLQ manual retry rate limits */
+  DLQ_RETRY_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(10),
+  DLQ_RETRY_RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().int().min(60).default(3600),
+  DLQ_RETRY_PER_JOB_MAX: z.coerce.number().int().min(1).default(3),
+  DLQ_RETRY_PER_JOB_WINDOW_SECONDS: z.coerce.number().int().min(60).default(86400),
+
+  /** Webhook intake limits */
+  WEBHOOK_MAX_TEXT_CHARS: z.coerce.number().int().min(1000).default(32768),
+  WEBHOOK_INTAKE_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(60),
+  WEBHOOK_INTAKE_RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().int().min(60).default(3600),
+  WEBHOOK_AUTOREPLY_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(10),
+  WEBHOOK_AUTOREPLY_RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().int().min(60).default(3600),
+
+  /** Comma-separated proxy IPs — when set, X-Forwarded-For is trusted */
+  TRUSTED_PROXY_IPS: z.string().optional(),
+
+  /** Explicit opt-in for unsigned webhooks on non-local databases (dev only) */
+  ALLOW_INSECURE_WEBHOOK: z
+    .enum(["true", "false"])
+    .default("false"),
 });
 
 
@@ -146,7 +180,30 @@ function parseEnv(): Env {
 
   }
 
-
+  if (process.env.NODE_ENV === "production") {
+    if (!parsed.data.ADMIN_PASSWORD_HASH) {
+      throw new Error(
+        "ADMIN_PASSWORD_HASH is required in production. Plaintext ADMIN_PASSWORD is not allowed."
+      );
+    }
+    if (parsed.data.ADMIN_PASSWORD) {
+      throw new Error(
+        "ADMIN_PASSWORD must not be set in production. Use ADMIN_PASSWORD_HASH only."
+      );
+    }
+    if (!parsed.data.AGENTMAIL_WEBHOOK_SECRET?.trim()) {
+      throw new Error("AGENTMAIL_WEBHOOK_SECRET is required in production.");
+    }
+    if (!parsed.data.HEALTH_CHECK_SECRET?.trim()) {
+      throw new Error("HEALTH_CHECK_SECRET is required in production.");
+    }
+    if (!parsed.data.REDIS_URL?.trim()) {
+      throw new Error("REDIS_URL is required in production.");
+    }
+    if (parsed.data.WORKER_FORCE_FAIL?.trim().toLowerCase() === "true") {
+      throw new Error("WORKER_FORCE_FAIL must not be enabled in production.");
+    }
+  }
 
   return parsed.data;
 

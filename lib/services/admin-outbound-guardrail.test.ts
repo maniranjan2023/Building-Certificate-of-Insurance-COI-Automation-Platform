@@ -47,4 +47,23 @@ describe("validateOutboundEmailContent", () => {
       })
     ).rejects.toThrow(/internal-only content/);
   });
+
+  it("scans long admin-edited bodies in chunks", async () => {
+    const { chatWithGroqFallback } = await import("@/lib/ai/groq-client");
+    const mock = vi.mocked(chatWithGroqFallback);
+    mock.mockClear();
+    mock.mockResolvedValue({
+      content: JSON.stringify({ unsafe: false, reason: "ok" }),
+      model: "test",
+    });
+
+    const body = "x".repeat(12000);
+    await validateOutboundEmailContent({
+      subject: "COI",
+      body,
+      isAdminEdited: true,
+    });
+
+    expect(mock.mock.calls.length).toBeGreaterThanOrEqual(2);
+  });
 });

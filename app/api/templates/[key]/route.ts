@@ -1,5 +1,10 @@
 import { z } from "zod";
 import { jsonError, jsonOk } from "@/lib/api-response";
+import { jsonInternalError } from "@/lib/api/handle-route-error";
+import {
+  isSessionResponse,
+  requireApiSession,
+} from "@/lib/api/require-api-session";
 import {
   EmailTemplateValidationError,
   updateEmailTemplate,
@@ -17,6 +22,8 @@ interface RouteContext {
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
+  const session = await requireApiSession();
+  if (isSessionResponse(session)) return session;
   try {
     const { key } = await context.params;
     const body = patchSchema.parse(await request.json());
@@ -29,8 +36,6 @@ export async function PATCH(request: Request, context: RouteContext) {
     if (error instanceof z.ZodError) {
       return jsonError(error.issues[0]?.message ?? "Invalid request.", 400);
     }
-    const message =
-      error instanceof Error ? error.message : "Failed to update template.";
-    return jsonError(message, 500);
+    return jsonInternalError(error, "templates.[key]");
   }
 }
