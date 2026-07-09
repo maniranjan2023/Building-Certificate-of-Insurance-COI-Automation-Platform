@@ -6,9 +6,10 @@ import { glassBar, glassIcon } from "@/components/marketing/glass-styles";
 import { cn } from "@/lib/utils";
 
 const NAV_LINKS = [
-  { href: "#features", label: "Features" },
+  { href: "#problem", label: "Problem" },
+  { href: "#solution", label: "Solution" },
   { href: "#how-it-works", label: "How it works" },
-  { href: "#pipeline", label: "AI pipeline" },
+  { href: "#features", label: "Benefits" },
   { href: "#faq", label: "FAQ" },
 ];
 

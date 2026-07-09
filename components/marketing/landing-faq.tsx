@@ -1,3 +1,4 @@
+import { LandingMotionSection } from "@/components/marketing/landing-motion-section";
 import { glassPanel } from "@/components/marketing/glass-styles";
 import { cn } from "@/lib/utils";
 
@@ -5,27 +6,27 @@ const FAQ_ITEMS = [
   {
     question: "What is a Certificate of Insurance (COI)?",
     answer:
-      "A COI is a one-page summary proving a tenant carries active liability coverage and names the landlord as additional insured. It's required at move-in and every renewal — but every insurer formats it differently.",
+      "A COI is proof that a tenant carries active liability coverage and names the landlord as additional insured. It's required at move-in and every renewal — but every insurer formats it differently, which makes manual review slow and error-prone.",
   },
   {
-    question: "Does the AI auto-approve COIs?",
+    question: "Does the platform auto-approve COIs?",
     answer:
-      "No. AI produces a draft report and suggested email, but an admin must Accept, Reject, or Send. Acceptance is blocked until mandatory checklist items pass and expiration dates are valid.",
+      "No. The system validates and drafts recommendations, but your compliance team always makes the final accept, reject, or send decision. Nothing goes to a tenant without your approval.",
   },
   {
-    question: "How do tenants submit COIs?",
+    question: "How do tenants submit their COIs?",
     answer:
-      "Tenants email PDF attachments to your AgentMail inbox, or admins upload directly from the dashboard. Both paths enqueue the same AI processing pipeline.",
+      "Tenants can email PDFs to your dedicated intake address or your team can upload directly from the dashboard. Either way, every submission is tracked in one compliance workspace.",
   },
   {
-    question: "What happens when a COI fails compliance?",
+    question: "What happens when a COI doesn't meet requirements?",
     answer:
-      "The checklist agent marks items as FAIL or MISSING. The report agent drafts a specific tenant email listing what's wrong. Admins review and send a templated Clauses Missing notification.",
+      "The platform identifies exactly which limits, dates, or endorsements are missing or insufficient. Your team reviews a clear draft message explaining what the tenant needs to fix — reducing back-and-forth resubmits.",
   },
   {
-    question: "Is there an audit trail?",
+    question: "Can we prove compliance during an audit?",
     answer:
-      "Yes. Every AI agent step, outbound email, version change, and admin decision is logged. Tenant Activity gives a full timeline per sender.",
+      "Yes. Every submission, review, decision, and tenant message is logged with timestamps. Export a full audit record per property or tenant when lenders, HOAs, or legal teams need documentation.",
   },
 ];
 
@@ -33,21 +34,23 @@ export function LandingFaq() {
   return (
     <section id="faq" className="py-20 sm:py-28">
       <div className="mx-auto max-w-3xl px-4 sm:px-6">
-        <div className="text-center">
+        <LandingMotionSection className="text-center">
           <p className="text-sm font-medium text-primary">FAQ</p>
           <h2 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
-            Common questions
+            Questions property teams ask
           </h2>
-        </div>
+        </LandingMotionSection>
 
-        <dl className="mt-12 space-y-6">
-          {FAQ_ITEMS.map((item) => (
-            <div key={item.question} className={cn("p-6", glassPanel)}>
-              <dt className="font-medium">{item.question}</dt>
-              <dd className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                {item.answer}
-              </dd>
-            </div>
+        <dl className="mt-12 space-y-4">
+          {FAQ_ITEMS.map((item, index) => (
+            <LandingMotionSection key={item.question} delay={index * 0.04}>
+              <div className={cn("p-6", glassPanel)}>
+                <dt className="font-medium">{item.question}</dt>
+                <dd className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                  {item.answer}
+                </dd>
+              </div>
+            </LandingMotionSection>
           ))}
         </dl>
       </div>

@@ -3,6 +3,8 @@ import {
   OutputGuardrailTripwireTriggered,
   type InputGuardrailDefinition,
   type OutputGuardrailDefinition,
+  type InputGuardrailFunctionArgs,
+  type OutputGuardrailFunctionArgs,
 } from "@/lib/ai/agents-sdk";
 
 /** Minimal agent stub — guardrail execute hooks only need a name on the agent. */
@@ -10,24 +12,24 @@ const GUARDRAIL_STUB_AGENT = { name: "coi-guardrail-stub" };
 
 const GUARDRAIL_STUB_CONTEXT = { context: {} };
 
-export function isGuardrailTripwireError(
-  error: unknown
-): error is InputGuardrailTripwireTriggered | OutputGuardrailTripwireTriggered {
+type GuardrailTripwireError =
+  | InputGuardrailTripwireTriggered
+  // SDK generic requires OutputGuardrailMetadata; instances are checked at runtime.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  | OutputGuardrailTripwireTriggered<any>;
+
+export function isGuardrailTripwireError(error: unknown): error is GuardrailTripwireError {
   return (
     error instanceof InputGuardrailTripwireTriggered ||
     error instanceof OutputGuardrailTripwireTriggered
   );
 }
 
-export function guardrailTripwireKind(
-  error: InputGuardrailTripwireTriggered | OutputGuardrailTripwireTriggered
-): "input" | "output" {
+export function guardrailTripwireKind(error: GuardrailTripwireError): "input" | "output" {
   return error instanceof InputGuardrailTripwireTriggered ? "input" : "output";
 }
 
-export function guardrailTripwireMessage(
-  error: InputGuardrailTripwireTriggered | OutputGuardrailTripwireTriggered
-): string {
+export function guardrailTripwireMessage(error: GuardrailTripwireError): string {
   const kind = guardrailTripwireKind(error);
   const name = error.result.guardrail.name;
   const info = error.result.output.outputInfo;
@@ -60,7 +62,7 @@ export async function executeInputGuardrails(
     agent: GUARDRAIL_STUB_AGENT,
     input,
     context: GUARDRAIL_STUB_CONTEXT,
-  };
+  } as InputGuardrailFunctionArgs;
 
   for (const guardrail of guardrails) {
     const result = await guardrail.run(args);
@@ -87,7 +89,7 @@ export async function executeOutputGuardrails(
     agent: GUARDRAIL_STUB_AGENT,
     agentOutput: rawOutput,
     context: GUARDRAIL_STUB_CONTEXT,
-  };
+  } as OutputGuardrailFunctionArgs;
 
   for (const guardrail of guardrails) {
     const result = await guardrail.run(args);

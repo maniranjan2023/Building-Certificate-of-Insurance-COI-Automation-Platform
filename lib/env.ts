@@ -75,6 +75,23 @@ const envSchema = z.object({
   EMAIL_SIGNATORY_TITLE: z.string().default("Property Manager"),
   EMAIL_COMPANY_NAME: z.string().default("Oakwood Property Management LLC"),
   EMAIL_PROPERTY_NAME: z.string().default("Oakwood Property Management LLC"),
+
+  /** Phase 6 — renewal cron & metrics */
+  CRON_SCHEDULE: z.string().default("0 9 * * *"),
+  REMINDER_DAYS_BEFORE: z.string().default("30,14,7,3"),
+  MANUAL_REVIEW_MINUTES: z.coerce.number().int().min(1).default(20),
+  HOURLY_RATE_USD: z.coerce.number().min(0).default(45),
+  PLATFORM_COST_ANNUAL_USD: z.coerce.number().min(0).default(1200),
+
+  /** Phase 6 — worker throughput & reliability */
+  WORKER_COI_CONCURRENCY: z.coerce.number().int().min(1).max(20).default(2),
+  WORKER_REMINDER_CONCURRENCY: z.coerce.number().int().min(1).max(20).default(3),
+  REMINDER_EMAIL_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(100),
+  REMINDER_EMAIL_RATE_LIMIT_MS: z.coerce.number().int().min(1000).default(60000),
+  CRON_LOCK_TTL_SECONDS: z.coerce.number().int().min(60).default(1800),
+
+  /** Domain only — optional documentation for ngrok / webhook setup. */
+  WEBHOOK_DOMAIN: z.string().optional(),
 });
 
 
@@ -239,5 +256,14 @@ export function shouldSendToLogfire(): boolean {
 
 export function resetEnvCache(): void {
   cachedEnv = null;
+}
+
+export function getReminderDaysBefore(): number[] {
+  const raw = getEnv().REMINDER_DAYS_BEFORE;
+  return raw
+    .split(",")
+    .map((part) => parseInt(part.trim(), 10))
+    .filter((value) => Number.isFinite(value) && value > 0)
+    .sort((a, b) => b - a);
 }
 

@@ -1,0 +1,80 @@
+direction down
+colorMode bold
+styleMode shadow
+typeface clean
+
+Tenant [icon: user, color: blue]
+Admin [icon: user, color: green]
+
+Intake [color: blue] {
+  AgentMail [icon: email]
+  ngrok [label: "ngrok dev tunnel", icon: server]
+  WebhookAPI [label: "POST /api/webhooks/agentmail", icon: api]
+  DashboardUpload [label: "POST /api/coi upload", icon: upload]
+}
+
+NextJS [label: "Next.js 15 COI Platform", icon: next-js, color: green] {
+  Portfolio [label: "/dashboard portfolio", icon: browser]
+  COIDetail [label: "/dashboard/[id] review pipeline", icon: browser]
+  TemplatesPage [label: "/templates email CRUD", icon: browser]
+  ChecklistPage [label: "/checklist compliance rules", icon: browser]
+  TenantsPage [label: "/tenants activity timeline", icon: browser]
+  RESTAPI [label: "REST API auth coi jobs templates", icon: api]
+}
+
+DataLayer [color: blue] {
+  NeonPostgres [label: "Neon Postgres Prisma", icon: postgresql]
+  CloudinaryStore [label: "Cloudinary PDF storage", icon: cloud]
+}
+
+QueueLayer [color: red] {
+  UpstashRedis [label: "Upstash Redis", icon: redis]
+  CoiJobsQueue [label: "coi-jobs queue", icon: queue]
+  CoiDLQ [label: "coi-jobs-dlq", icon: queue]
+  ReminderJobs [label: "reminder-jobs Phase 6", icon: queue]
+}
+
+WorkerProcess [label: "BullMQ Worker npm run worker", icon: server, color: orange] {
+  ProcessCoiJob [label: "process-coi handler", icon: cog]
+  SendTemplateJob [label: "send-template-email handler", icon: mail]
+}
+
+AIPipeline [icon: brain, color: purple] {
+  LlamaParseOCR [label: "LlamaParse OCR", icon: file-text]
+  Agent1 [label: "Agent 1 Document Classifier", icon: robot]
+  Agent2 [label: "Agent 2 Field Extraction", icon: robot]
+  Agent3 [label: "Agent 3 Checklist Compliance", icon: robot]
+  Agent4 [label: "Agent 4 Risk Analysis", icon: robot]
+  Agent5 [label: "Agent 5 Report Generator", icon: robot]
+  Guardrails [label: "Input Output Guardrails", icon: shield]
+}
+
+GroqLLM [label: "Groq LLM", icon: ai, color: purple]
+CronScheduler [label: "node-cron daily Phase 6", icon: clock, color: gray]
+
+Tenant > AgentMail: "COI PDF email"
+AgentMail > ngrok > WebhookAPI
+WebhookAPI > RESTAPI
+Admin > Portfolio
+Admin > DashboardUpload
+DashboardUpload > RESTAPI
+Portfolio > RESTAPI
+COIDetail > RESTAPI
+RESTAPI > NeonPostgres
+RESTAPI > CloudinaryStore: "store PDF"
+RESTAPI > CoiJobsQueue: "enqueue process-coi"
+CoiJobsQueue > ProcessCoiJob
+ProcessCoiJob > CloudinaryStore: "download PDF"
+ProcessCoiJob > LlamaParseOCR
+LlamaParseOCR > Agent1 > Agent2 > Agent3 > Agent4 > Agent5
+Agent1, Agent2, Agent3, Agent4, Agent5 > GroqLLM
+ProcessCoiJob > Guardrails
+ProcessCoiJob > NeonPostgres: "AiRun AgentStep CoiVersion"
+ProcessCoiJob > COIDetail: "READY_FOR_REVIEW"
+COIDetail > SendTemplateJob: "Accept Reject Send"
+SendTemplateJob > AgentMail: "templated outbound email"
+SendTemplateJob > NeonPostgres: "OutboundEmail audit"
+AgentMail > Tenant: "compliance reply"
+CoiJobsQueue > CoiDLQ: "failed after 5 retries"
+CronScheduler > ReminderJobs
+ReminderJobs > SendTemplateJob: "send-reminder"

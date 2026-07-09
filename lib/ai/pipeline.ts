@@ -328,7 +328,7 @@ export async function runCoiAiPipeline(
           logInfo("pipeline.guardrail_blocked", {
             coiJobId: data.coiJobId,
             tripwire,
-            agent: aiRun.currentStepLabel,
+            agent: aiRun.currentStepLabel ?? undefined,
           });
 
           return {

@@ -1,5 +1,6 @@
-import type { JobsOptions } from "bullmq";
+import type { JobsOptions, WorkerOptions } from "bullmq";
 import { getEnv } from "@/lib/env";
+import { createBackoffStrategy } from "@/lib/queue/backoff";
 
 export function getDefaultJobOptions(): JobsOptions {
   const env = getEnv();
@@ -19,5 +20,20 @@ export function getEnqueueJobOptions(jobId: string): JobsOptions {
   return {
     jobId,
     ...getDefaultJobOptions(),
+  };
+}
+
+/** Worker-level jitter backoff to spread retries and avoid spikes. */
+export function getWorkerBackoffSettings(): WorkerOptions["settings"] {
+  return {
+    backoffStrategy: createBackoffStrategy(),
+  };
+}
+
+export function getReminderWorkerLimiter(): WorkerOptions["limiter"] {
+  const env = getEnv();
+  return {
+    max: env.REMINDER_EMAIL_RATE_LIMIT_MAX,
+    duration: env.REMINDER_EMAIL_RATE_LIMIT_MS,
   };
 }
