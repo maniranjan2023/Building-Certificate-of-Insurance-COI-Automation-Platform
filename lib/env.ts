@@ -300,12 +300,13 @@ export function getLlamaCloudApiKey(): string {
 }
 
 export function getLogfireToken(): string | undefined {
-  const token = getEnv().LOGFIRE_TOKEN?.trim();
+  const token = tryGetEnv()?.LOGFIRE_TOKEN?.trim();
   return token || undefined;
 }
 
 export function shouldSendToLogfire(): boolean {
-  const env = getEnv();
+  const env = tryGetEnv();
+  if (!env) return false;
   if (env.LOGFIRE_SEND_TO_LOGFIRE === "true") return true;
   if (env.LOGFIRE_SEND_TO_LOGFIRE === "false") return false;
   return Boolean(getLogfireToken());

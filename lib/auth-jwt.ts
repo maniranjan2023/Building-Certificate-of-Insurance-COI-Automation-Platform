@@ -1,5 +1,6 @@
-import { SignJWT, jwtVerify } from "jose";
-import { getEnv } from "@/lib/env";
+import { SignJWT } from "jose/jwt/sign";
+import { jwtVerify } from "jose/jwt/verify";
+import { getEnv, tryGetEnv } from "@/lib/env";
 
 export const AUTH_COOKIE_NAME = "coi_session";
 
@@ -8,12 +9,24 @@ export interface AdminSession {
   role: "admin";
 }
 
-function getJwtSecret(): Uint8Array {
-  return new TextEncoder().encode(getEnv().JWT_SECRET);
+function getJwtSecret(): Uint8Array | null {
+  const secret = tryGetEnv()?.JWT_SECRET;
+  if (!secret) {
+    return null;
+  }
+  return new TextEncoder().encode(secret);
+}
+
+function requireJwtSecret(): Uint8Array {
+  const secret = getJwtSecret();
+  if (!secret) {
+    throw new Error("JWT_SECRET is not configured");
+  }
+  return secret;
 }
 
 export function getSessionMaxAgeSeconds(): number {
-  return getEnv().SESSION_MAX_AGE_SECONDS;
+  return tryGetEnv()?.SESSION_MAX_AGE_SECONDS ?? 86400;
 }
 
 /**
@@ -23,8 +36,13 @@ export function getSessionMaxAgeSeconds(): number {
 export async function verifySessionToken(
   token: string
 ): Promise<AdminSession | null> {
+  const secret = getJwtSecret();
+  if (!secret) {
+    return null;
+  }
+
   try {
-    const { payload } = await jwtVerify(token, getJwtSecret());
+    const { payload } = await jwtVerify(token, secret);
     if (payload.role !== "admin" || typeof payload.email !== "string") {
       return null;
     }
@@ -54,5 +72,5 @@ export async function createSessionToken(
     .setJti(jti)
     .setIssuedAt()
     .setExpirationTime(`${getSessionMaxAgeSeconds()}s`)
-    .sign(getJwtSecret());
+    .sign(requireJwtSecret());
 }

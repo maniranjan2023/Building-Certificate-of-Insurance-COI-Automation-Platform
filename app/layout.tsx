@@ -3,7 +3,6 @@ import { Geist_Mono } from "next/font/google";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppToastProvider } from "@/components/providers/app-toast-provider";
 import { BoneyardProvider } from "@/components/providers/boneyard-provider";
-import "../bones/registry";
 import "./globals.css";
 
 const geistMono = Geist_Mono({

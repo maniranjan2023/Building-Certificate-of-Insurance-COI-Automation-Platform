@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { configureBoneyard } from "boneyard-js/react";
+import "../../bones/registry";
 
 /** Runtime defaults for dark-theme skeleton bones. */
 export function BoneyardProvider({ children }: { children: React.ReactNode }) {

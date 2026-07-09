@@ -11,50 +11,72 @@ const PUBLIC_PATHS = [
   "/api/webhooks/agentmail",
 ];
 
+function isPublicPath(pathname: string): boolean {
+  return (
+    PUBLIC_PATHS.some(
+      (path) => pathname === path || pathname.startsWith(`${path}/`)
+    ) ||
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/favicon")
+  );
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  const isPublic =
-    PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`)) ||
-    pathname.startsWith("/_next") ||
-    pathname.startsWith("/favicon");
-
-  if (isPublic) {
-    const response = NextResponse.next();
-    response.headers.set("x-pathname", pathname);
-    return response;
-  }
-
-  if (pathname.startsWith("/api/health")) {
-    if (verifyHealthBearer(request.headers.get("authorization"))) {
+  try {
+    if (isPublicPath(pathname)) {
       const response = NextResponse.next();
       response.headers.set("x-pathname", pathname);
       return response;
     }
-  }
 
-  const token = request.cookies.get(AUTH_COOKIE_NAME)?.value;
-  const session = token ? await verifySessionToken(token) : null;
+    if (pathname.startsWith("/api/health")) {
+      if (verifyHealthBearer(request.headers.get("authorization"))) {
+        const response = NextResponse.next();
+        response.headers.set("x-pathname", pathname);
+        return response;
+      }
+    }
 
-  if (!session) {
+    const token = request.cookies.get(AUTH_COOKIE_NAME)?.value;
+    const session = token ? await verifySessionToken(token) : null;
+
+    if (!session) {
+      if (pathname.startsWith("/api/")) {
+        return NextResponse.json(
+          { success: false, error: "Unauthorized" },
+          { status: 401 }
+        );
+      }
+
+      const loginUrl = new URL("/login", request.url);
+      return NextResponse.redirect(loginUrl);
+    }
+
+    if (pathname === "/login") {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
+
+    const response = NextResponse.next();
+    response.headers.set("x-pathname", pathname);
+    return response;
+  } catch (error) {
+    console.error("[middleware] unhandled error:", error);
+
     if (pathname.startsWith("/api/")) {
       return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 }
+        { success: false, error: "Service unavailable" },
+        { status: 503 }
       );
     }
 
-    const loginUrl = new URL("/login", request.url);
-    return NextResponse.redirect(loginUrl);
-  }
+    if (isPublicPath(pathname)) {
+      return NextResponse.next();
+    }
 
-  if (pathname === "/login") {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    return NextResponse.redirect(new URL("/login", request.url));
   }
-
-  const response = NextResponse.next();
-  response.headers.set("x-pathname", pathname);
-  return response;
 }
 
 export const config = {

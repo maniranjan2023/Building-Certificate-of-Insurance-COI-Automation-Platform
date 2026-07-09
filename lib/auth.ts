@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { decodeJwt } from "jose";
+import { decodeJwt } from "jose/jwt/decode";
 import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
 import { getEnv } from "@/lib/env";
