@@ -5,7 +5,7 @@ import type { ProcessCoiJobData } from "@/lib/jobs/types";
 import { sendAutoIntakeEmail } from "@/lib/services/intake-email";
 import { enqueueSendTemplateEmailJob } from "@/lib/services/jobs";
 import { updateCoiJobStatus } from "@/lib/services/jobs";
-import { logError, logInfo } from "@/lib/observability/logfire.node";
+import { logError, logInfo } from "@/lib/observability/logfire";
 
 function shouldForceFail(data: ProcessCoiJobData): boolean {
   if (data.forceFail === true) {

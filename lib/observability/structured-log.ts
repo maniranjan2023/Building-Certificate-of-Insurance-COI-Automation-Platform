@@ -1,4 +1,4 @@
-import { logError, logInfo } from "@/lib/observability/logfire.node";
+import { logError, logInfo } from "@/lib/observability/logfire";
 
 export type LogLevel = "info" | "warn" | "error";
 

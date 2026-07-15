@@ -4,13 +4,26 @@ import { applyLogfireOtelEnv } from "@/lib/observability/otel-env";
 type LogfireModule = typeof import("@pydantic/logfire-node");
 
 let configured = false;
+let loadFailed = false;
 let logfireModule: LogfireModule | null = null;
 
-function loadLogfireModule(): LogfireModule {
+function loadLogfireModule(): LogfireModule | null {
+  if (loadFailed) {
+    return null;
+  }
   if (!logfireModule) {
-    // Worker-only module — never import this from Next.js app code.
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    logfireModule = require("@pydantic/logfire-node") as LogfireModule;
+    try {
+      // Optional Node-only telemetrics. Never let ESM/CJS mismatches crash Inngest/Vercel.
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      logfireModule = require("@pydantic/logfire-node") as LogfireModule;
+    } catch (error) {
+      loadFailed = true;
+      console.warn(
+        "[logfire] @pydantic/logfire-node unavailable — using console logging.",
+        error instanceof Error ? error.message : error
+      );
+      return null;
+    }
   }
   return logfireModule;
 }
@@ -38,13 +51,26 @@ export function configureLogfire(options?: {
   applyLogfireOtelEnv();
 
   const logfire = loadLogfireModule();
-  logfire.configure({
-    token,
-    serviceName,
-    environment: env.LOGFIRE_ENVIRONMENT,
-    sendToLogfire: true,
-    console: env.LOGFIRE_CONSOLE === "true",
-  });
+  if (!logfire) {
+    return false;
+  }
+
+  try {
+    logfire.configure({
+      token,
+      serviceName,
+      environment: env.LOGFIRE_ENVIRONMENT,
+      sendToLogfire: true,
+      console: env.LOGFIRE_CONSOLE === "true",
+    });
+  } catch (error) {
+    loadFailed = true;
+    console.warn(
+      "[logfire] configure failed — using console logging.",
+      error instanceof Error ? error.message : error
+    );
+    return false;
+  }
 
   configured = true;
   console.log(`[logfire] configured → ${serviceName} (${env.LOGFIRE_ENVIRONMENT})`);

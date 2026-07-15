@@ -1,7 +1,7 @@
 import { getOptionalRedis } from "@/lib/security/redis-client";
 import { getRedisUrl } from "@/lib/env";
 import Redis from "ioredis";
-import { logError, logInfo } from "@/lib/observability/logfire.node";
+import { logError, logInfo } from "@/lib/observability/logfire";
 
 export interface DlqEntry {
   id: string;

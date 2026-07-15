@@ -30,7 +30,7 @@ import {
 import { listChecklistItems } from "@/lib/services/checklist";
 import { prisma } from "@/lib/prisma";
 import { resolveCoiAssetUrl } from "@/lib/services/cloudinary";
-import { logError, logInfo, withSpan } from "@/lib/observability/logfire.node";
+import { logError, logInfo, withSpan } from "@/lib/observability/logfire";
 
 async function downloadDocumentBuffer(url: string): Promise<Buffer> {
   const response = await fetch(url);

@@ -3,7 +3,7 @@ import { writeDlqEntry, type DlqEntry } from "@/lib/dlq/redis-dlq";
 import { updateCoiJobStatus } from "@/lib/services/jobs";
 import { notifyProcessingErrorForJob } from "@/lib/workers/process-coi";
 import type { ProcessCoiJobData } from "@/lib/jobs/types";
-import { logError, logInfo } from "@/lib/observability/logfire.node";
+import { logError, logInfo } from "@/lib/observability/logfire";
 import { structuredLog } from "@/lib/observability/structured-log";
 
 function toProcessCoiPayload(

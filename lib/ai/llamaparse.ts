@@ -1,7 +1,7 @@
 import LlamaCloud from "@llamaindex/llama-cloud";
 import { cloudBBoxToTextItem } from "@/lib/ai/visual-citations";
 import { getEnv, getLlamaCloudApiKey } from "@/lib/env";
-import { withSpan } from "@/lib/observability/logfire.node";
+import { withSpan } from "@/lib/observability/logfire";
 import type { ParseLayoutPage, TextItem } from "@/lib/types/field-bboxes";
 
 let client: LlamaCloud | null = null;
