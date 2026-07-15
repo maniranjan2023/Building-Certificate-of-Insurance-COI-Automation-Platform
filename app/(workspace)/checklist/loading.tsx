@@ -1,6 +1,10 @@
 import { RouteSkeleton } from "@/components/skeletons/route-skeleton";
-import { ChecklistPageFixture } from "@/components/skeletons/fixtures/checklist";
+import { ChecklistPageSkeleton } from "@/components/skeletons/shadcn-page-skeletons";
 
 export default function ChecklistLoading() {
-  return <RouteSkeleton name="checklist" fixture={<ChecklistPageFixture />} />;
+  return (
+    <RouteSkeleton name="checklist">
+      <ChecklistPageSkeleton />
+    </RouteSkeleton>
+  );
 }

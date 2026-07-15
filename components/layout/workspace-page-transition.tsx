@@ -3,49 +3,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { useNavigationPending } from "@/components/layout/navigation-pending";
-import { RouteSkeleton } from "@/components/skeletons/route-skeleton";
-import { Spinner } from "@/components/ui/spinner";
-import { DashboardPortfolioFixture } from "@/components/skeletons/fixtures/dashboard-portfolio";
-import { JobsPageFixture } from "@/components/skeletons/fixtures/jobs";
-import { TenantsPageFixture } from "@/components/skeletons/fixtures/tenants";
-import { TenantDetailFixture } from "@/components/skeletons/fixtures/tenant-detail";
-import { ChecklistPageFixture } from "@/components/skeletons/fixtures/checklist";
-import { TemplatesPageFixture } from "@/components/skeletons/fixtures/templates";
-import { MetricsPageFixture } from "@/components/skeletons/fixtures/metrics";
-import { CoiDetailFixture } from "@/components/skeletons/fixtures/coi-detail";
-import { CompareVersionsFixture } from "@/components/skeletons/fixtures/compare";
+import { resolveShadcnPageSkeleton } from "@/components/skeletons/shadcn-page-skeletons";
 import { cn } from "@/lib/utils";
-
-function resolveRouteSkeleton(href: string): { name: string; fixture: ReactNode } {
-  if (href.startsWith("/dashboard/jobs")) {
-    return { name: "dashboard-jobs", fixture: <JobsPageFixture /> };
-  }
-  if (href.startsWith("/dashboard/compare")) {
-    return { name: "dashboard-compare", fixture: <CompareVersionsFixture /> };
-  }
-  if (/^\/dashboard\/[^/]+$/.test(href)) {
-    return { name: "coi-detail", fixture: <CoiDetailFixture /> };
-  }
-  if (href === "/dashboard") {
-    return { name: "dashboard-portfolio", fixture: <DashboardPortfolioFixture /> };
-  }
-  if (/^\/tenants\/[^/]+$/.test(href)) {
-    return { name: "tenant-detail", fixture: <TenantDetailFixture /> };
-  }
-  if (href.startsWith("/tenants")) {
-    return { name: "tenants-list", fixture: <TenantsPageFixture /> };
-  }
-  if (href.startsWith("/checklist")) {
-    return { name: "checklist", fixture: <ChecklistPageFixture /> };
-  }
-  if (href.startsWith("/templates")) {
-    return { name: "templates", fixture: <TemplatesPageFixture /> };
-  }
-  if (href.startsWith("/metrics")) {
-    return { name: "metrics", fixture: <MetricsPageFixture /> };
-  }
-  return { name: "dashboard-portfolio", fixture: <DashboardPortfolioFixture /> };
-}
 
 function pathMatchesTarget(pathname: string, target: string): boolean {
   if (pathname === target) return true;
@@ -62,8 +21,8 @@ function waitForNextPaint(): Promise<void> {
 }
 
 /**
- * Smooth shadcn/21st-style page loader: skeleton stays up until the destination
- * route URL matches AND the page content has painted into the DOM.
+ * Shows a shadcn Skeleton layout immediately on tab/link click, and hides it
+ * only after the destination route content has painted — never a blank screen.
  */
 export function WorkspacePageTransition({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -109,7 +68,7 @@ export function WorkspacePageTransition({ children }: { children: ReactNode }) {
           setHeldHref(null);
           setRevealing(false);
           markContentReady();
-        }, 220);
+        }, 180);
         return true;
       };
 
@@ -132,7 +91,7 @@ export function WorkspacePageTransition({ children }: { children: ReactNode }) {
             setHeldHref(null);
             setRevealing(false);
             markContentReady();
-          }, 180);
+          }, 160);
         }
       }, 4500);
     }
@@ -148,7 +107,6 @@ export function WorkspacePageTransition({ children }: { children: ReactNode }) {
 
   const loading = Boolean(heldHref) || isNavigating;
   const skeletonHref = heldHref ?? pendingHref ?? pathname;
-  const skeleton = resolveRouteSkeleton(skeletonHref);
 
   return (
     <div className="relative min-h-[55vh] min-w-0">
@@ -156,10 +114,10 @@ export function WorkspacePageTransition({ children }: { children: ReactNode }) {
         ref={contentRef}
         key={pathname}
         className={cn(
-          "min-w-0 transition-[opacity,transform,filter] duration-300 ease-out",
+          "min-w-0 transition-opacity duration-300 ease-out",
           loading
-            ? "pointer-events-none absolute inset-x-0 top-0 translate-y-1 scale-[0.995] opacity-0 blur-[2px]"
-            : "relative translate-y-0 scale-100 opacity-100 blur-0 animate-in fade-in duration-300"
+            ? "pointer-events-none absolute inset-x-0 top-0 opacity-0"
+            : "relative opacity-100 animate-in fade-in duration-300"
         )}
         aria-hidden={loading}
       >
@@ -170,19 +128,13 @@ export function WorkspacePageTransition({ children }: { children: ReactNode }) {
         <div
           className={cn(
             "min-w-0 transition-opacity duration-300 ease-out",
-            revealing
-              ? "opacity-0"
-              : "animate-in fade-in slide-in-from-bottom-1 duration-300 opacity-100"
+            revealing ? "opacity-0" : "opacity-100 animate-in fade-in duration-200"
           )}
           aria-busy="true"
           aria-live="polite"
           aria-label="Loading page"
         >
-          <div className="mb-3 flex items-center gap-2.5 text-xs font-medium text-muted-foreground">
-            <Spinner className="size-3.5 text-primary" label="Loading workspace" />
-            Loading workspace…
-          </div>
-          <RouteSkeleton name={skeleton.name} fixture={skeleton.fixture} />
+          {resolveShadcnPageSkeleton(skeletonHref)}
         </div>
       ) : null}
     </div>

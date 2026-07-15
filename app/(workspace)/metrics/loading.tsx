@@ -1,6 +1,10 @@
 import { RouteSkeleton } from "@/components/skeletons/route-skeleton";
-import { MetricsPageFixture } from "@/components/skeletons/fixtures/metrics";
+import { MetricsPageSkeleton } from "@/components/skeletons/shadcn-page-skeletons";
 
 export default function MetricsLoading() {
-  return <RouteSkeleton name="metrics" fixture={<MetricsPageFixture />} />;
+  return (
+    <RouteSkeleton name="metrics">
+      <MetricsPageSkeleton />
+    </RouteSkeleton>
+  );
 }

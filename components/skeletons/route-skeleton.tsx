@@ -1,34 +1,25 @@
-"use client";
-
-import { Skeleton } from "boneyard-js/react";
 import type { ReactNode } from "react";
 
 interface RouteSkeletonProps {
-  name: string;
-  fixture: ReactNode;
+  /** Optional route name kept for call-site compatibility. */
+  name?: string;
+  /** Prefer passing a dedicated shadcn page skeleton as children or fixture. */
+  fixture?: ReactNode;
+  children?: ReactNode;
 }
 
-/** Route-level loading UI for Next.js `loading.tsx` files. */
-export function RouteSkeleton({ name, fixture }: RouteSkeletonProps) {
+/**
+ * Route-level loading UI for Next.js `loading.tsx` files.
+ * Renders shadcn Skeleton layouts (no spinner / blank flash).
+ */
+export function RouteSkeleton({ fixture, children }: RouteSkeletonProps) {
   return (
-    <div className="animate-in fade-in duration-300 fill-mode-both">
-      <Skeleton
-        name={name}
-        loading
-        fixture={fixture}
-        snapshotConfig={{ leafTags: ["section", "article", "table", "aside"] }}
-        fallback={
-          <div
-            className="pointer-events-none select-none animate-pulse opacity-80"
-            aria-busy="true"
-            aria-label="Loading page"
-          >
-            {fixture}
-          </div>
-        }
-      >
-        <div className="min-h-[1px]" aria-hidden />
-      </Skeleton>
+    <div
+      className="min-w-0 animate-in fade-in duration-200 fill-mode-both"
+      aria-busy="true"
+      aria-label="Loading page"
+    >
+      {children ?? fixture}
     </div>
   );
 }

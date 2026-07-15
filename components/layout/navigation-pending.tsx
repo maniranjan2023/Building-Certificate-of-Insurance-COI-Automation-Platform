@@ -133,22 +133,7 @@ export function useNavigationPending() {
   return useContext(NavigationPendingContext);
 }
 
-/** Animated top progress bar while a workspace route transition is in flight. */
+/** Animated top progress bar (optional — unused by default shell). */
 export function NavigationProgressBar() {
-  const { isNavigating } = useNavigationPending();
-
-  return (
-    <div
-      className="pointer-events-none absolute inset-x-0 top-0 z-30 h-1 overflow-hidden bg-transparent"
-      aria-hidden={!isNavigating}
-    >
-      <div
-        className={`h-full w-1/3 rounded-full bg-primary shadow-[0_0_14px_oklch(0.62_0.19_255/0.5)] transition-opacity duration-200 ${
-          isNavigating
-            ? "animate-[workspace-nav-indeterminate_1.15s_ease-in-out_infinite] opacity-100"
-            : "opacity-0"
-        }`}
-      />
-    </div>
-  );
+  return null;
 }

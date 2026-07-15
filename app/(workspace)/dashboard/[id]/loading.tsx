@@ -1,6 +1,10 @@
 import { RouteSkeleton } from "@/components/skeletons/route-skeleton";
-import { CoiDetailFixture } from "@/components/skeletons/fixtures/coi-detail";
+import { CoiDetailSkeleton } from "@/components/skeletons/shadcn-page-skeletons";
 
 export default function CoiDetailLoading() {
-  return <RouteSkeleton name="coi-detail" fixture={<CoiDetailFixture />} />;
+  return (
+    <RouteSkeleton name="coi-detail">
+      <CoiDetailSkeleton />
+    </RouteSkeleton>
+  );
 }

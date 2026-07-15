@@ -6,6 +6,9 @@ const nextConfig: NextConfig = {
   // Admin workspace pages must not reuse stale client RSC payloads after
   // background job / upload updates. zero = refetch on every soft navigation.
   experimental: {
+    // On Windows, parallel static workers can race renaming export/500.html →
+    // server/pages/500.html (ENOENT). Cap workers to keep the build stable.
+    ...(process.platform === "win32" ? { cpus: 1 } : {}),
     staleTimes: {
       dynamic: 0,
       static: 0,

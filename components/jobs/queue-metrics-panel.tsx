@@ -2,9 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Activity, RefreshCw } from "lucide-react";
-import { Skeleton } from "boneyard-js/react";
 import type { QueueMetricsSnapshot } from "@/lib/services/queue-metrics";
-import { QueueMetricsFixture } from "@/components/skeletons/fixtures/queue-metrics";
+import { QueueMetricsSkeleton } from "@/components/skeletons/shadcn-page-skeletons";
 import { Button } from "@/components/ui/button";
 
 function statusColor(value: number): string {
@@ -95,44 +94,36 @@ export function QueueMetricsPanel() {
     };
   }, [load]);
 
-  return (
-    <Skeleton
-      name="queue-metrics-panel"
-      loading={loading}
-      fixture={<QueueMetricsFixture />}
-      snapshotConfig={{ leafTags: ["section"] }}
-      fallback={
-        <div className="pointer-events-none animate-pulse opacity-80">
-          <QueueMetricsFixture />
-        </div>
-      }
-    >
-      <section className="rounded-2xl border bg-card p-4 shadow-sm md:p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="inline-flex items-center gap-2 text-sm font-medium text-primary">
-              <Activity className="size-4" />
-              Live queue monitoring
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Inngest job status + Redis DLQ depth (refreshes on demand)
-            </p>
-          </div>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => void load()}
-            disabled={loading}
-          >
-            <RefreshCw className={`size-3.5 ${loading ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
-        </div>
+  if (loading && !metrics) {
+    return <QueueMetricsSkeleton />;
+  }
 
-        {error ? <p className="mt-3 text-sm text-destructive">{error}</p> : null}
-        {metrics ? <QueueMetricsContent metrics={metrics} /> : null}
-      </section>
-    </Skeleton>
+  return (
+    <section className="rounded-2xl border bg-card p-4 shadow-sm md:p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="inline-flex items-center gap-2 text-sm font-medium text-primary">
+            <Activity className="size-4" />
+            Live queue monitoring
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Inngest job status + Redis DLQ depth (refreshes on demand)
+          </p>
+        </div>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={() => void load()}
+          disabled={loading}
+        >
+          <RefreshCw className="size-3.5" />
+          Refresh
+        </Button>
+      </div>
+
+      {error ? <p className="mt-3 text-sm text-destructive">{error}</p> : null}
+      {metrics ? <QueueMetricsContent metrics={metrics} /> : null}
+    </section>
   );
 }

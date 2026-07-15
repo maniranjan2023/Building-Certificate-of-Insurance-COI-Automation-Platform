@@ -24,11 +24,12 @@ This visits `/bones-capture` (all route fixtures) and `/dashboard/jobs` (panel s
 
 | Trigger | Location |
 |---------|----------|
-| Sidebar navigation | Shared `app/(workspace)/layout.tsx` keeps the shell mounted; each route’s `loading.tsx` shows instantly |
-| Queue metrics fetch | `components/jobs/queue-metrics-panel.tsx` |
-| Cron scan fetch | `components/jobs/cron-scan-panel.tsx` |
+| Sidebar / in-app navigation | Shared workspace shell shows shadcn `Skeleton` page layouts until content paints |
+| Next.js `loading.tsx` | Same shadcn page skeletons under `components/skeletons/shadcn-page-skeletons.tsx` |
+| Queue metrics fetch | `QueueMetricsSkeleton` |
+| Cron scan fetch | `CronScanSkeleton` |
 
-If bones snapshots are missing, `RouteSkeleton` falls back to the route fixture (pulsing layout) instead of a blank gray panel.
+Loading uses [shadcn/ui Skeleton](https://ui.shadcn.com/docs/components/skeleton) only — no blank screens and no route-level spinners.
 
 ## Skeleton names (for `bones:build`)
 

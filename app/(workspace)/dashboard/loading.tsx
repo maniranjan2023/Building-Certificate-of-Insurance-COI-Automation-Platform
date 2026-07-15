@@ -1,6 +1,10 @@
 import { RouteSkeleton } from "@/components/skeletons/route-skeleton";
-import { DashboardPortfolioFixture } from "@/components/skeletons/fixtures/dashboard-portfolio";
+import { DashboardPortfolioSkeleton } from "@/components/skeletons/shadcn-page-skeletons";
 
 export default function DashboardLoading() {
-  return <RouteSkeleton name="dashboard-portfolio" fixture={<DashboardPortfolioFixture />} />;
+  return (
+    <RouteSkeleton name="dashboard-portfolio">
+      <DashboardPortfolioSkeleton />
+    </RouteSkeleton>
+  );
 }

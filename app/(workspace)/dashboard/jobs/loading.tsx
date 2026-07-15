@@ -1,6 +1,10 @@
 import { RouteSkeleton } from "@/components/skeletons/route-skeleton";
-import { JobsPageFixture } from "@/components/skeletons/fixtures/jobs";
+import { JobsPageSkeleton } from "@/components/skeletons/shadcn-page-skeletons";
 
 export default function JobsLoading() {
-  return <RouteSkeleton name="dashboard-jobs" fixture={<JobsPageFixture />} />;
+  return (
+    <RouteSkeleton name="dashboard-jobs">
+      <JobsPageSkeleton />
+    </RouteSkeleton>
+  );
 }
