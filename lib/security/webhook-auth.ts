@@ -47,7 +47,11 @@ export function verifyAgentMailWebhook(request: Request): void {
   const authorization = request.headers.get("authorization");
   const bearer =
     authorization?.startsWith("Bearer ") ? authorization.slice(7).trim() : null;
-  const headerSecret = request.headers.get("x-agentmail-webhook-secret")?.trim();
+  const headerSecret =
+    request.headers.get("x-agentmail-webhook-secret")?.trim() ||
+    // AgentMail dashboard custom header name (seen in production webhook logs)
+    request.headers.get("agentmail_webhook_secret")?.trim() ||
+    request.headers.get("AGENTMAIL_WEBHOOK_SECRET")?.trim();
   const provided = bearer ?? headerSecret;
 
   if (!provided || !secretsMatch(provided, secret)) {

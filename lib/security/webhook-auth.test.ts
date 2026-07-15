@@ -35,4 +35,17 @@ describe("webhook auth", () => {
 
     expect(() => verifyAgentMailWebhook(request)).toThrow(WebhookAuthError);
   });
+
+  it("accepts AgentMail dashboard AGENTMAIL_WEBHOOK_SECRET header", () => {
+    vi.spyOn(envModule, "tryGetEnv").mockReturnValue({
+      AGENTMAIL_WEBHOOK_SECRET: "test-secret",
+    } as ReturnType<typeof envModule.tryGetEnv>);
+
+    const request = new Request("http://localhost/api/webhooks/agentmail", {
+      method: "POST",
+      headers: { AGENTMAIL_WEBHOOK_SECRET: "test-secret" },
+    });
+
+    expect(() => verifyAgentMailWebhook(request)).not.toThrow();
+  });
 });
