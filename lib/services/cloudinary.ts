@@ -57,12 +57,31 @@ function toUploadError(error: unknown): CloudinaryUploadError {
   return new CloudinaryUploadError("Cloudinary upload failed.");
 }
 
+function inferResourceTypeFromCloudinaryUrl(
+  storedUrl?: string | null
+): "image" | "raw" | "video" {
+  const match = storedUrl?.match(/res\.cloudinary\.com\/[^/]+\/(image|raw|video)\//);
+  if (match?.[1]) {
+    return match[1] as "image" | "raw" | "video";
+  }
+  // Uploads use resource_type "auto"; Cloudinary stores PDFs as image assets. Older signed
+  // URLs incorrectly used /auto/authenticated/, which Cloudinary rejects with 400.
+  if (storedUrl?.includes("/auto/")) {
+    return "image";
+  }
+  return "image";
+}
+
 export function getSignedCoiAssetUrl(
   publicId: string,
-  options?: { resourceType?: "image" | "raw" | "video" | "auto" }
+  options?: {
+    resourceType?: "image" | "raw" | "video";
+    storedUrl?: string | null;
+  }
 ): string {
   configureCloudinary();
-  const resourceType = options?.resourceType ?? "auto";
+  const resourceType =
+    options?.resourceType ?? inferResourceTypeFromCloudinaryUrl(options?.storedUrl);
 
   return cloudinary.url(publicId, {
     resource_type: resourceType,
@@ -74,7 +93,7 @@ export function getSignedCoiAssetUrl(
 
 function inferLegacyResourceType(
   storedUrl: string
-): "image" | "raw" | "video" | "auto" {
+): "image" | "raw" | "video" {
   const match = storedUrl.match(/res\.cloudinary\.com\/[^/]+\/(image|raw|video)\//);
   return (match?.[1] as "image" | "raw" | "video" | undefined) ?? "raw";
 }
@@ -97,13 +116,13 @@ export function getSignedLegacyCoiAssetUrl(
 }
 
 export function resolveCoiAssetUrl(publicId: string, storedUrl?: string | null): string {
-  if (storedUrl?.includes("/authenticated/")) {
-    return getSignedCoiAssetUrl(publicId);
+  if (storedUrl?.includes("/authenticated/") || storedUrl?.includes("/auto/")) {
+    return getSignedCoiAssetUrl(publicId, { storedUrl });
   }
   if (storedUrl?.includes("res.cloudinary.com")) {
     return getSignedLegacyCoiAssetUrl(publicId, storedUrl);
   }
-  return getSignedCoiAssetUrl(publicId);
+  return getSignedCoiAssetUrl(publicId, { storedUrl });
 }
 
 export async function uploadCoiDocument(
@@ -156,7 +175,7 @@ export async function uploadCoiBuffer(
   });
 
   return {
-    url: getSignedCoiAssetUrl(result.public_id),
+    url: getSignedCoiAssetUrl(result.public_id, { storedUrl: result.secure_url }),
     publicId: result.public_id,
     bytes: result.bytes,
   };

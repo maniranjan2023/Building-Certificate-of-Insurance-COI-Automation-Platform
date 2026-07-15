@@ -35,7 +35,11 @@ import { logError, logInfo, withSpan } from "@/lib/observability/logfire";
 async function downloadDocumentBuffer(url: string): Promise<Buffer> {
   const response = await fetch(url);
   if (!response.ok) {
-    throw new Error(`Failed to download COI from Cloudinary (${response.status})`);
+    const detail = await response.text().catch(() => "");
+    const snippet = detail.slice(0, 200).replace(/\s+/g, " ").trim();
+    throw new Error(
+      `Failed to download COI from Cloudinary (${response.status})${snippet ? `: ${snippet}` : ""}`
+    );
   }
   return Buffer.from(await response.arrayBuffer());
 }

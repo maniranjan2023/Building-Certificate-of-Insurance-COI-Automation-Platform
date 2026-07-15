@@ -34,6 +34,12 @@ export async function GET(_request: Request, { params }: RouteParams) {
     );
     const upstream = await fetch(signedUrl);
     if (!upstream.ok) {
+      const detail = await upstream.text().catch(() => "");
+      console.error("coi.pdf upstream Cloudinary error", {
+        documentId: id,
+        status: upstream.status,
+        detail: detail.slice(0, 300),
+      });
       return NextResponse.json({ error: "Failed to fetch PDF" }, { status: 502 });
     }
 
