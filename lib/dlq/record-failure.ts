@@ -1,5 +1,11 @@
 import { JobStatus } from "@prisma/client";
 import { writeDlqEntry, type DlqEntry } from "@/lib/dlq/redis-dlq";
+import {
+  buildDlqMetadata,
+  buildFailureReason,
+  extractErrorDetails,
+  extractInngestFailureContext,
+} from "@/lib/dlq/failure-context";
 import { updateCoiJobStatus } from "@/lib/services/jobs";
 import { notifyProcessingErrorForJob } from "@/lib/workers/process-coi";
 import type { ProcessCoiJobData } from "@/lib/jobs/types";
@@ -43,40 +49,87 @@ function toProcessCoiPayload(
   };
 }
 
-export async function recordPermanentJobFailure(input: {
-  eventName: string;
-  payload: Record<string, unknown>;
-  error: Error | { message?: string; name?: string; stack?: string };
-  executionId: string;
-  retryCount: number;
-  metadata?: Record<string, unknown>;
-}): Promise<DlqEntry> {
-  const coiJobId =
-    typeof input.payload.coiJobId === "string"
-      ? input.payload.coiJobId
-      : `unknown-${input.executionId}`;
+/** Persist a mid-retry failure so the dashboard leaves "Processing". */
+export async function recordAttemptFailure(input: {
+  coiJobId: string;
+  error: unknown;
+  attempt: number;
+  runId?: string;
+  maxAttempts?: number;
+}): Promise<void> {
+  const details = extractErrorDetails(input.error);
+  const failureReason = buildFailureReason({
+    message: details.message,
+    executionId: input.runId,
+    attempt: input.attempt,
+    maxAttempts: input.maxAttempts,
+  });
 
-  const errorMessage =
-    input.error instanceof Error
-      ? input.error.message
-      : input.error.message ?? "Unknown error";
-  const stack =
-    input.error instanceof Error
-      ? input.error.stack
-      : typeof input.error.stack === "string"
-        ? input.error.stack
-        : undefined;
+  try {
+    await updateCoiJobStatus(input.coiJobId, {
+      status: JobStatus.FAILED,
+      attempts: input.attempt + 1,
+      failureReason,
+    });
+  } catch (error) {
+    logError("job.attempt_failure_status_failed", error, {
+      id: input.coiJobId,
+    });
+  }
+
+  structuredLog({
+    event: "inngest.job.attempt_failed",
+    level: "error",
+    coiJobId: input.coiJobId,
+    attempt: input.attempt + 1,
+    error: details.message,
+    message: failureReason,
+  });
+}
+
+export async function recordPermanentJobFailure(input: {
+  error: unknown;
+  event: { data?: unknown };
+  maxAttempts?: number;
+}): Promise<DlqEntry> {
+  const ctx = extractInngestFailureContext({
+    error: input.error,
+    event: input.event,
+  });
+
+  const maxAttempts =
+    input.maxAttempts ?? Number(process.env.JOB_MAX_ATTEMPTS ?? "5");
+
+  const coiJobId =
+    typeof ctx.payload.coiJobId === "string"
+      ? ctx.payload.coiJobId
+      : `unknown-${ctx.executionId}`;
+
+  const failureReason = buildFailureReason({
+    message: ctx.errorMessage,
+    executionId: ctx.executionId,
+    attempt: Math.max(0, maxAttempts - 1),
+    maxAttempts,
+  });
 
   const entry: DlqEntry = {
     id: coiJobId,
-    eventName: input.eventName,
-    payload: input.payload,
-    error: errorMessage,
-    stack,
+    eventName: ctx.eventName,
+    payload: ctx.payload,
+    error: failureReason,
+    stack: ctx.stack,
     failedAt: new Date().toISOString(),
-    retryCount: input.retryCount,
-    executionId: input.executionId,
-    metadata: input.metadata,
+    retryCount: maxAttempts,
+    executionId: ctx.executionId,
+    metadata: buildDlqMetadata({
+      functionId: ctx.functionId,
+      errorName: ctx.errorName,
+      maxAttempts,
+      extra: {
+        rawError: ctx.errorMessage,
+        eventName: ctx.eventName,
+      },
+    }),
   };
 
   logInfo("inngest.job.permanent_failure", {
@@ -105,16 +158,16 @@ export async function recordPermanentJobFailure(input: {
   try {
     await updateCoiJobStatus(coiJobId, {
       status: JobStatus.DLQ,
-      failureReason: errorMessage,
+      failureReason,
       dlqJobId: entry.id,
-      attempts: input.retryCount,
+      attempts: maxAttempts,
     });
   } catch (error) {
     logError("dlq.db_status_failed", error, { id: entry.id });
   }
 
-  if (input.eventName === "coi/process.requested") {
-    const processPayload = toProcessCoiPayload(input.payload);
+  if (ctx.eventName === "coi/process.requested") {
+    const processPayload = toProcessCoiPayload(ctx.payload);
     if (processPayload) {
       try {
         await notifyProcessingErrorForJob(processPayload);

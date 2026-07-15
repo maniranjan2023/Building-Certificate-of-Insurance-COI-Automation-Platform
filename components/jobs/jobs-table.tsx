@@ -112,6 +112,7 @@ export function JobsTable({ jobs, dlqJobs }: JobsTableProps) {
                     <th className="px-2 py-2 font-medium">Version</th>
                     <th className="px-2 py-2 font-medium">Status</th>
                     <th className="px-2 py-2 font-medium">Attempts</th>
+                    <th className="px-2 py-2 font-medium">Error</th>
                     <th className="px-2 py-2 font-medium">Created</th>
                   </tr>
                 </thead>
@@ -144,6 +145,18 @@ export function JobsTable({ jobs, dlqJobs }: JobsTableProps) {
                         />
                       </td>
                       <td className="px-2 py-2.5 text-muted-foreground">{job.attempts}</td>
+                      <td
+                        className="max-w-[280px] px-2 py-2.5 text-xs text-destructive"
+                        title={job.failureReason ?? undefined}
+                      >
+                        {job.failureReason ? (
+                          <span className="line-clamp-2 whitespace-pre-wrap break-words">
+                            {job.failureReason}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </td>
                       <td className="px-2 py-2.5 text-muted-foreground">
                         {formatDate(job.createdAt)}
                       </td>
@@ -188,7 +201,7 @@ export function JobsTable({ jobs, dlqJobs }: JobsTableProps) {
                     <th className="px-2 py-2 font-medium">File</th>
                     <th className="px-2 py-2 font-medium">Type</th>
                     <th className="px-2 py-2 font-medium">Queue</th>
-                    <th className="px-2 py-2 font-medium">Reason</th>
+                    <th className="px-2 py-2 font-medium">Failure details</th>
                     <th className="px-2 py-2 font-medium">Attempts</th>
                     <th className="px-2 py-2 font-medium">Actions</th>
                   </tr>
@@ -209,8 +222,18 @@ export function JobsTable({ jobs, dlqJobs }: JobsTableProps) {
                         </span>
                       </td>
                       <td className="px-2 py-2.5 text-xs text-muted-foreground">{job.queueName}</td>
-                      <td className="max-w-xs truncate px-2 py-2.5 text-muted-foreground">
-                        {job.failureReason ?? "Unknown error"}
+                      <td className="max-w-md px-2 py-2.5">
+                        <p
+                          className="whitespace-pre-wrap break-words text-xs text-destructive"
+                          title={job.failureReason ?? undefined}
+                        >
+                          {job.failureReason ?? "Unknown error"}
+                        </p>
+                        {job.dlqJobId ? (
+                          <p className="mt-1 text-[11px] text-muted-foreground">
+                            DLQ id: {job.dlqJobId}
+                          </p>
+                        ) : null}
                       </td>
                       <td className="px-2 py-2.5 text-muted-foreground">{job.attempts}</td>
                       <td className="px-2 py-2.5">

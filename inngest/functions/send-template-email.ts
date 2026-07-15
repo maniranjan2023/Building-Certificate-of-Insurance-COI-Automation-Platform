@@ -1,6 +1,9 @@
 import { inngest } from "@/inngest/client";
 import { sendTemplateEmailRequested } from "@/inngest/events";
-import { recordPermanentJobFailure } from "@/lib/dlq/record-failure";
+import {
+  recordAttemptFailure,
+  recordPermanentJobFailure,
+} from "@/lib/dlq/record-failure";
 import {
   handleSendTemplateEmailJob,
   markEmailJobProcessing,
@@ -12,6 +15,10 @@ function resolveRetries(): number {
   return retries;
 }
 
+function maxAttempts(): number {
+  return resolveRetries() + 1;
+}
+
 export const sendTemplateEmailFunction = inngest.createFunction(
   {
     id: "send-template-email",
@@ -19,16 +26,10 @@ export const sendTemplateEmailFunction = inngest.createFunction(
     triggers: [sendTemplateEmailRequested],
     retries: resolveRetries() as 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10,
     onFailure: async ({ error, event }) => {
-      const original = event.data.event;
       await recordPermanentJobFailure({
-        eventName: original.name,
-        payload: (original.data ?? {}) as Record<string, unknown>,
         error,
-        executionId: event.data.run_id,
-        retryCount: Number(process.env.JOB_MAX_ATTEMPTS ?? "5"),
-        metadata: {
-          functionId: event.data.function_id,
-        },
+        event,
+        maxAttempts: maxAttempts(),
       });
     },
   },
@@ -39,9 +40,20 @@ export const sendTemplateEmailFunction = inngest.createFunction(
       await markEmailJobProcessing(data.coiJobId);
     });
 
-    await step.run("send-email", async () => {
-      await handleSendTemplateEmailJob(data);
-    });
+    try {
+      await step.run("send-email", async () => {
+        await handleSendTemplateEmailJob(data);
+      });
+    } catch (error) {
+      await recordAttemptFailure({
+        coiJobId: data.coiJobId,
+        error,
+        attempt,
+        runId,
+        maxAttempts: maxAttempts(),
+      });
+      throw error;
+    }
 
     return {
       coiJobId: data.coiJobId,

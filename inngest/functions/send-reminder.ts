@@ -1,6 +1,9 @@
 import { inngest } from "@/inngest/client";
 import { sendReminderRequested } from "@/inngest/events";
-import { recordPermanentJobFailure } from "@/lib/dlq/record-failure";
+import {
+  recordAttemptFailure,
+  recordPermanentJobFailure,
+} from "@/lib/dlq/record-failure";
 import {
   handleSendReminderJob,
   markReminderJobProcessing,
@@ -27,6 +30,10 @@ function resolveThrottle() {
   };
 }
 
+function maxAttempts(): number {
+  return resolveRetries() + 1;
+}
+
 export const sendReminderFunction = inngest.createFunction(
   {
     id: "send-reminder",
@@ -35,19 +42,12 @@ export const sendReminderFunction = inngest.createFunction(
     retries: resolveRetries() as 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10,
     concurrency: { limit: resolveConcurrency() },
     throttle: resolveThrottle(),
-    // Idempotent per document + window (official Inngest idempotency)
     idempotency: "event.data.coiDocumentId + '-' + event.data.daysBefore",
     onFailure: async ({ error, event }) => {
-      const original = event.data.event;
       await recordPermanentJobFailure({
-        eventName: original.name,
-        payload: (original.data ?? {}) as Record<string, unknown>,
         error,
-        executionId: event.data.run_id,
-        retryCount: Number(process.env.JOB_MAX_ATTEMPTS ?? "5"),
-        metadata: {
-          functionId: event.data.function_id,
-        },
+        event,
+        maxAttempts: maxAttempts(),
       });
     },
   },
@@ -58,9 +58,20 @@ export const sendReminderFunction = inngest.createFunction(
       await markReminderJobProcessing(data.coiJobId);
     });
 
-    await step.run("send-reminder-email", async () => {
-      await handleSendReminderJob(data);
-    });
+    try {
+      await step.run("send-reminder-email", async () => {
+        await handleSendReminderJob(data);
+      });
+    } catch (error) {
+      await recordAttemptFailure({
+        coiJobId: data.coiJobId,
+        error,
+        attempt,
+        runId,
+        maxAttempts: maxAttempts(),
+      });
+      throw error;
+    }
 
     return {
       coiJobId: data.coiJobId,

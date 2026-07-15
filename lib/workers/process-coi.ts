@@ -6,6 +6,7 @@ import { sendAutoIntakeEmail } from "@/lib/services/intake-email";
 import { enqueueSendTemplateEmailJob } from "@/lib/services/jobs";
 import { updateCoiJobStatus } from "@/lib/services/jobs";
 import { logError, logInfo } from "@/lib/observability/logfire";
+import { prisma } from "@/lib/prisma";
 
 function shouldForceFail(data: ProcessCoiJobData): boolean {
   if (data.forceFail === true) {
@@ -105,7 +106,11 @@ export async function handleProcessCoiJob(
 }
 
 export async function markJobProcessing(coiJobId: string): Promise<void> {
-  await updateCoiJobStatus(coiJobId, { status: JobStatus.PROCESSING });
+  const existing = await prisma.coiJob.findUnique({ where: { id: coiJobId } });
+  await updateCoiJobStatus(coiJobId, {
+    status: JobStatus.PROCESSING,
+    attempts: (existing?.attempts ?? 0) + 1,
+  });
 }
 
 export async function notifyProcessingErrorForJob(
