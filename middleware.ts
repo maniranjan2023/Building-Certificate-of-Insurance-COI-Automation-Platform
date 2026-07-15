@@ -9,6 +9,9 @@ const PUBLIC_PATHS = [
   "/api/auth/login",
   "/api/auth/logout",
   "/api/webhooks/agentmail",
+  // Inngest serve endpoint — secured by INNGEST_SIGNING_KEY, not session cookies.
+  // @see https://www.inngest.com/docs/learn/serving-inngest-functions
+  "/api/inngest",
 ];
 
 function isPublicPath(pathname: string): boolean {
