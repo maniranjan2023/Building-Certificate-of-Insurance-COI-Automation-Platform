@@ -1,12 +1,14 @@
 import type {
-  ChecklistAgentOutput,
   ExtractionAgentOutput,
   ReportAgentOutput,
   RiskAgentOutput,
 } from "@/lib/ai/schemas";
 import type { AiRunWithSteps } from "@/lib/services/ai-run";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import {
+  ChecklistResultsTable,
+  parseChecklistResults,
+} from "@/components/coi/checklist-results-table";
 
 interface AiResultsPanelProps {
   version: {
@@ -19,23 +21,12 @@ interface AiResultsPanelProps {
   };
   aiRun: AiRunWithSteps | null;
   hideTimeline?: boolean;
+  /** When true, checklist is rendered elsewhere (e.g. dashboard detail tables row). */
+  hideChecklist?: boolean;
 }
 
 function asExtraction(value: unknown): ExtractionAgentOutput | null {
   return value && typeof value === "object" ? (value as ExtractionAgentOutput) : null;
-}
-
-function asChecklist(value: unknown): ChecklistAgentOutput | null {
-  if (!value || typeof value !== "object") return null;
-  const raw = value as Partial<ChecklistAgentOutput>;
-  if (!Array.isArray(raw.items)) return null;
-  return {
-    items: raw.items,
-    mandatoryFailures: Array.isArray(raw.mandatoryFailures)
-      ? raw.mandatoryFailures
-      : [],
-    allPassed: raw.allPassed ?? false,
-  };
 }
 
 function asRisk(value: unknown): RiskAgentOutput | null {
@@ -74,20 +65,24 @@ function asReport(value: unknown): ReportAgentOutput | null {
   };
 }
 
-function statusColor(status: string): string {
-  if (status === "PASS") return "bg-emerald-500/15 text-emerald-400 border-emerald-500/30";
-  if (status === "FAIL") return "bg-red-500/15 text-red-400 border-red-500/30";
-  return "bg-amber-500/15 text-amber-400 border-amber-500/30";
-}
-
-export function AiResultsPanel({ version, aiRun, hideTimeline }: AiResultsPanelProps) {
+export function AiResultsPanel({
+  version,
+  aiRun,
+  hideTimeline,
+  hideChecklist = false,
+}: AiResultsPanelProps) {
   const extraction = asExtraction(version.extractedFields);
-  const checklist = asChecklist(version.checklistResults);
+  const checklist = parseChecklistResults(version.checklistResults);
   const risk = asRisk(version.riskAnalysis);
   const report = asReport(version.draftReport);
 
   const hasResults =
-    extraction || checklist || risk || report || version.rawOcrText || aiRun;
+    extraction ||
+    (!hideChecklist && checklist) ||
+    risk ||
+    report ||
+    version.rawOcrText ||
+    aiRun;
 
   if (!hasResults) {
     return (
@@ -151,35 +146,8 @@ export function AiResultsPanel({ version, aiRun, hideTimeline }: AiResultsPanelP
         </Card>
       ) : null}
 
-      {checklist?.items?.length ? (
-        <Card className="gap-3 py-4">
-          <CardHeader className="gap-1 px-4 pb-0">
-            <CardTitle className="text-lg">Checklist results</CardTitle>
-            <CardDescription className="text-sm">
-              {checklist.allPassed
-                ? "All checklist items passed"
-                : `${checklist.mandatoryFailures.length} mandatory issue(s)`}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2 px-4 pb-4">
-            {checklist.items.map((item) => (
-              <div
-                key={item.checklistItemId}
-                className="flex flex-wrap items-start justify-between gap-2 rounded-md border p-3 text-sm"
-              >
-                <div>
-                  <p className="font-medium">{item.label}</p>
-                  {item.evidence ? (
-                    <p className="mt-1 text-muted-foreground">{item.evidence}</p>
-                  ) : null}
-                </div>
-                <Badge variant="outline" className={statusColor(item.status)}>
-                  {item.status}
-                </Badge>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+      {!hideChecklist && checklist?.items?.length ? (
+        <ChecklistResultsTable checklist={checklist} />
       ) : null}
 
       {risk ? (

@@ -81,13 +81,31 @@ export function QueueMetricsPanel() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    function refetchWhenVisible() {
+      if (document.visibilityState === "visible") {
+        void load();
+      }
+    }
+    document.addEventListener("visibilitychange", refetchWhenVisible);
+    window.addEventListener("focus", refetchWhenVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", refetchWhenVisible);
+      window.removeEventListener("focus", refetchWhenVisible);
+    };
+  }, [load]);
+
   return (
     <Skeleton
       name="queue-metrics-panel"
       loading={loading}
       fixture={<QueueMetricsFixture />}
       snapshotConfig={{ leafTags: ["section"] }}
-      fallback={<QueueMetricsFixture />}
+      fallback={
+        <div className="pointer-events-none animate-pulse opacity-80">
+          <QueueMetricsFixture />
+        </div>
+      }
     >
       <section className="rounded-2xl border bg-card p-4 shadow-sm md:p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">

@@ -1,6 +1,8 @@
 import { CoiPdfViewer } from "@/components/coi/coi-pdf-viewer-dynamic";
 import { CoiPipelinePanel } from "@/components/coi/coi-pipeline-panel";
 import { CoiDetailHeader } from "@/components/coi/coi-detail-header";
+import { parseChecklistResults } from "@/components/coi/checklist-results-table";
+import { LiveChecklistResults } from "@/components/coi/live-checklist-results";
 import { getPipelineStatusForDocument } from "@/lib/services/pipeline-status";
 import { notFound } from "next/navigation";
 import { getCoiDocumentByIdWithLatestJob } from "@/lib/services/coi";
@@ -38,6 +40,9 @@ export default async function CoiDetailPage({ params }: CoiDetailPageProps) {
   const jobReady = document.latestJob?.status === JobStatus.READY_FOR_REVIEW;
   const draftReport = document.version
     ? asReport(document.version.draftReport)
+    : null;
+  const checklist = document.version
+    ? parseChecklistResults(document.version.checklistResults)
     : null;
   const recipientEmail =
     document.senderEmail ?? document.sender?.email ?? null;
@@ -109,8 +114,6 @@ export default async function CoiDetailPage({ params }: CoiDetailPageProps) {
             </section>
           )}
 
-          {document.version ? <DocumentActivityPanel coiDocumentId={id} /> : null}
-
           {document.version ? (
             <ReviewActionsPanel
               documentId={id}
@@ -124,6 +127,17 @@ export default async function CoiDetailPage({ params }: CoiDetailPageProps) {
           ) : null}
         </div>
       </div>
+
+      {document.version ? (
+        <div className="grid min-w-0 items-start gap-4 xl:grid-cols-2">
+          <LiveChecklistResults
+            documentId={id}
+            initialChecklist={checklist}
+            isPipelineActive={pipelineStatus?.isActive ?? false}
+          />
+          <DocumentActivityPanel coiDocumentId={id} />
+        </div>
+      ) : null}
     </div>
   );
 }

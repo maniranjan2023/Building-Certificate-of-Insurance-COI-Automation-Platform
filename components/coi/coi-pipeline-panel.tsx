@@ -50,6 +50,10 @@ export function CoiPipelinePanel({
   }, [documentId]);
 
   useEffect(() => {
+    setStatus(initialStatus);
+  }, [initialStatus]);
+
+  useEffect(() => {
     if (!status.isActive) return;
     const interval = setInterval(() => {
       void fetchStatus();
@@ -194,6 +198,7 @@ export function CoiPipelinePanel({
         version={status.version ?? {}}
         aiRun={syntheticAiRun}
         hideTimeline
+        hideChecklist
       />
     </div>
   );

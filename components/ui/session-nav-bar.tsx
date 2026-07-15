@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { motion, type Transition } from "framer-motion";
 import {
   ChevronsUpDown,
@@ -27,6 +27,7 @@ import {
   getInitials,
   type NavItem,
 } from "@/lib/navigation";
+import { useNavigationPending } from "@/components/layout/navigation-pending";
 
 const SIDEBAR_COLLAPSED_WIDTH = "3.05rem";
 const SIDEBAR_EXPANDED_WIDTH = "15rem";
@@ -129,6 +130,7 @@ function NavLink({
   return (
     <Link
       href={item.href}
+      prefetch={false}
       className={className}
       onClick={() => onNavigate(item.href)}
       aria-busy={isNavigating || undefined}
@@ -144,13 +146,9 @@ export interface SessionNavBarProps {
 
 export function SessionNavBar({ userEmail }: SessionNavBarProps) {
   const [isCollapsed, setIsCollapsed] = useState(true);
-  const [pendingHref, setPendingHref] = useState<string | null>(null);
   const pathname = usePathname();
+  const { pendingHref, setPendingHref } = useNavigationPending();
   const initials = getInitials(userEmail);
-
-  useEffect(() => {
-    setPendingHref(null);
-  }, [pathname]);
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });

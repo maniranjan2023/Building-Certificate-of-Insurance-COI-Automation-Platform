@@ -24,9 +24,11 @@ This visits `/bones-capture` (all route fixtures) and `/dashboard/jobs` (panel s
 
 | Trigger | Location |
 |---------|----------|
-| Sidebar navigation | `app/**/loading.tsx` per route |
+| Sidebar navigation | Shared `app/(workspace)/layout.tsx` keeps the shell mounted; each route’s `loading.tsx` shows instantly |
 | Queue metrics fetch | `components/jobs/queue-metrics-panel.tsx` |
 | Cron scan fetch | `components/jobs/cron-scan-panel.tsx` |
+
+If bones snapshots are missing, `RouteSkeleton` falls back to the route fixture (pulsing layout) instead of a blank gray panel.
 
 ## Skeleton names (for `bones:build`)
 

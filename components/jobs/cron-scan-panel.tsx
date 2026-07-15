@@ -44,13 +44,31 @@ export function CronScanPanel() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    function refetchWhenVisible() {
+      if (document.visibilityState === "visible") {
+        void load();
+      }
+    }
+    document.addEventListener("visibilitychange", refetchWhenVisible);
+    window.addEventListener("focus", refetchWhenVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", refetchWhenVisible);
+      window.removeEventListener("focus", refetchWhenVisible);
+    };
+  }, [load]);
+
   return (
     <Skeleton
       name="cron-scan-panel"
       loading={loading}
       fixture={<CronScanFixture />}
       snapshotConfig={{ leafTags: ["section", "table"] }}
-      fallback={<CronScanFixture />}
+      fallback={
+        <div className="pointer-events-none animate-pulse opacity-80">
+          <CronScanFixture />
+        </div>
+      }
     >
       <section className="rounded-2xl border bg-card p-4 shadow-sm md:p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">

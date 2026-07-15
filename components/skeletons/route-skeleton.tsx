@@ -18,9 +18,12 @@ export function RouteSkeleton({ name, fixture }: RouteSkeletonProps) {
       snapshotConfig={{ leafTags: ["section", "article", "table", "aside"] }}
       fallback={
         <div
-          className="min-h-[50vh] animate-pulse rounded-2xl bg-muted/40"
-          aria-hidden
-        />
+          className="pointer-events-none select-none animate-pulse opacity-80"
+          aria-busy="true"
+          aria-label="Loading page"
+        >
+          {fixture}
+        </div>
       }
     >
       <div className="min-h-[1px]" aria-hidden />

@@ -3,6 +3,14 @@ import path from "path";
 
 const nextConfig: NextConfig = {
   outputFileTracingRoot: path.join(__dirname),
+  // Admin workspace pages must not reuse stale client RSC payloads after
+  // background job / upload updates. zero = refetch on every soft navigation.
+  experimental: {
+    staleTimes: {
+      dynamic: 0,
+      static: 0,
+    },
+  },
   serverExternalPackages: [
     "ioredis",
     "inngest",

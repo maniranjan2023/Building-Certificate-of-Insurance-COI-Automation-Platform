@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { JobStatus } from "@prisma/client";
 import { RotateCcw, Trash2 } from "lucide-react";
 import type { CoiJobWithRelations } from "@/lib/services/jobs";
 import { JOB_STATUS_LABELS } from "@/lib/constants/job-status";
@@ -33,6 +34,24 @@ export function JobsTable({ jobs, dlqJobs }: JobsTableProps) {
   const [dismissingId, setDismissingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dlqFilter, setDlqFilter] = useState<DlqFilter>("all");
+
+  const hasLiveJobs = useMemo(
+    () =>
+      jobs.some(
+        (job) =>
+          job.status === JobStatus.QUEUED || job.status === JobStatus.PROCESSING
+      ),
+    [jobs]
+  );
+
+  // Keep queue/status lists fresh while jobs are still running.
+  useEffect(() => {
+    if (!hasLiveJobs) return;
+    const interval = setInterval(() => {
+      router.refresh();
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [hasLiveJobs, router]);
 
   const filteredDlq = useMemo(() => {
     if (dlqFilter === "reminder") {
