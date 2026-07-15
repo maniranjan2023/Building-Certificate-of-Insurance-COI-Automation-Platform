@@ -7,6 +7,7 @@ import {
   getActiveNavContext,
   getSubPageLabel,
 } from "@/lib/navigation";
+import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { cn } from "@/lib/utils";
 
 interface WorkspaceHeaderProps {
@@ -47,7 +48,9 @@ export function WorkspaceHeader({ pathname }: WorkspaceHeaderProps) {
             <span className="flex size-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <ShieldCheck className="size-4" />
             </span>
-            <span className="text-sm font-semibold tracking-tight">{PRODUCT_NAME}</span>
+            <span className="text-sm font-semibold tracking-tight">
+              {PRODUCT_NAME}
+            </span>
           </Link>
 
           <div className="hidden h-8 w-px shrink-0 bg-border sm:block" aria-hidden />
@@ -99,11 +102,9 @@ export function WorkspaceHeader({ pathname }: WorkspaceHeaderProps) {
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
+          <ThemeToggle />
           <span className="hidden rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-400 md:inline-flex">
             Live
-          </span>
-          <span className="rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-primary">
-            Phase 5
           </span>
         </div>
       </div>

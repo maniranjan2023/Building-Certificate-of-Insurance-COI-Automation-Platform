@@ -18,11 +18,14 @@ import type {
 interface CoiPipelinePanelProps {
   documentId: string;
   initialStatus: PipelineStatusResponse;
+  /** When false, only the pipeline timeline is shown (results render separately). */
+  showAiResults?: boolean;
 }
 
 export function CoiPipelinePanel({
   documentId,
   initialStatus,
+  showAiResults = true,
 }: CoiPipelinePanelProps) {
   const [status, setStatus] = useState(initialStatus);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -111,7 +114,7 @@ export function CoiPipelinePanel({
 
   return (
     <div className="min-w-0 space-y-4">
-      <section className="relative overflow-hidden rounded-2xl border bg-card shadow-sm">
+      <section className="relative min-w-0 overflow-hidden rounded-2xl border bg-card shadow-sm">
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_100%_0%,oklch(0.62_0.19_255/0.08),transparent_60%)]"
@@ -119,14 +122,19 @@ export function CoiPipelinePanel({
         <div className="relative space-y-4 p-5 md:p-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
-              <h2 className="text-lg font-semibold tracking-tight">AI processing pipeline</h2>
-              <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-                Live worker and agent steps. Click a completed step to inspect input and JSON output.
+              <h2 className="text-lg font-semibold tracking-tight">
+                AI processing pipeline
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Live worker and agent steps. Click a completed step to inspect
+                input and JSON output.
               </p>
             </div>
             {status.isActive ? (
               <div className="flex shrink-0 items-center gap-2 rounded-full border bg-background/80 px-3 py-1.5 text-xs text-muted-foreground">
-                {isRefreshing ? <Loader2 className="size-3.5 animate-spin" /> : null}
+                {isRefreshing ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : null}
                 Live · updates every 2s
               </div>
             ) : null}
@@ -142,19 +150,22 @@ export function CoiPipelinePanel({
               <Badge variant="outline">AI run: {status.aiRunStatus}</Badge>
             ) : null}
             {status.isActive && status.currentStepLabel ? (
-              <Badge variant="outline" className="border-sky-500/40 text-sky-400">
+              <Badge
+                variant="outline"
+                className="border-sky-500/40 text-sky-600 dark:text-sky-400"
+              >
                 Now: {formatStepLabel(status.currentStepLabel)}
               </Badge>
             ) : null}
           </div>
 
           {status.failureReason ? (
-            <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400">
+            <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400">
               {status.failureReason}
             </p>
           ) : null}
 
-          <div className="min-w-0 rounded-xl border bg-muted/20 p-4">
+          <div className="min-w-0 overflow-x-hidden rounded-xl border bg-muted/20 p-4 md:p-5">
             {status.isActive && status.steps.length === 0 ? (
               <p className="mb-3 text-sm text-muted-foreground">
                 Waiting for worker to start… current stage:{" "}
@@ -163,27 +174,24 @@ export function CoiPipelinePanel({
             ) : null}
             {status.steps.length === 0 && !status.isActive ? (
               <p className="mb-3 text-sm text-muted-foreground">
-                No pipeline activity yet. Upload a COI and ensure the worker is running.
+                No pipeline activity yet. Upload a COI and ensure processing is
+                running.
               </p>
             ) : null}
 
             <Timeline
               items={timelineItems}
-              orientation="horizontal"
+              orientation="vertical"
               variant="compact"
             />
 
             {status.isActive ? (
               <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="size-4 animate-spin text-sky-400" />
+                <Loader2 className="size-4 animate-spin text-sky-500 dark:text-sky-400" />
                 {formatStepLabel(status.currentStepLabel ?? "processing")}…
               </div>
             ) : null}
           </div>
-
-          <p className="text-xs text-muted-foreground">
-            Completed steps with agent data open a detail dialog. Scroll the timeline horizontally if needed.
-          </p>
         </div>
       </section>
 
@@ -194,12 +202,14 @@ export function CoiPipelinePanel({
         onOpenChange={setDialogOpen}
       />
 
-      <AiResultsPanel
-        version={status.version ?? {}}
-        aiRun={syntheticAiRun}
-        hideTimeline
-        hideChecklist
-      />
+      {showAiResults ? (
+        <AiResultsPanel
+          version={status.version ?? {}}
+          aiRun={syntheticAiRun}
+          hideTimeline
+          hideChecklist
+        />
+      ) : null}
     </div>
   );
 }

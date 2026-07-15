@@ -108,3 +108,12 @@ html {
 body {
   @apply bg-background font-mono text-base text-foreground antialiased;
 }
+
+@keyframes workspace-nav-indeterminate {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(420%);
+  }
+}

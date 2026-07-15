@@ -4,8 +4,8 @@ import { useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 /**
- * Clears the App Router client cache so each sidebar navigation (and tab focus)
- * re-fetches Server Component data instead of showing a stale snapshot.
+ * Re-fetches Server Component data after soft navigations settle, and when
+ * the browser tab becomes visible again — without fighting the page loader.
  */
 export function RefreshOnRouteChange() {
   const pathname = usePathname();
@@ -17,7 +17,13 @@ export function RefreshOnRouteChange() {
       isFirstRender.current = false;
       return;
     }
-    router.refresh();
+
+    // Wait for WorkspacePageTransition settle before refreshing under the hood.
+    const timer = window.setTimeout(() => {
+      router.refresh();
+    }, 420);
+
+    return () => window.clearTimeout(timer);
   }, [pathname, router]);
 
   useEffect(() => {
@@ -27,15 +33,9 @@ export function RefreshOnRouteChange() {
       }
     }
 
-    function onFocus() {
-      router.refresh();
-    }
-
     document.addEventListener("visibilitychange", onVisibilityChange);
-    window.addEventListener("focus", onFocus);
     return () => {
       document.removeEventListener("visibilitychange", onVisibilityChange);
-      window.removeEventListener("focus", onFocus);
     };
   }, [router]);
 

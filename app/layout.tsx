@@ -3,6 +3,7 @@ import { Geist_Mono } from "next/font/google";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppToastProvider } from "@/components/providers/app-toast-provider";
 import { BoneyardProvider } from "@/components/providers/boneyard-provider";
+import { ThemeProvider } from "@/components/providers/theme-provider";
 import "./globals.css";
 
 const geistMono = Geist_Mono({
@@ -22,17 +23,20 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`dark ${geistMono.variable}`}
-      suppressHydrationWarning
-    >
+    <html lang="en" className={geistMono.variable} suppressHydrationWarning>
       <body className="font-mono antialiased" suppressHydrationWarning>
-        <AppToastProvider>
-          <BoneyardProvider>
-            <TooltipProvider>{children}</TooltipProvider>
-          </BoneyardProvider>
-        </AppToastProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <AppToastProvider>
+            <BoneyardProvider>
+              <TooltipProvider>{children}</TooltipProvider>
+            </BoneyardProvider>
+          </AppToastProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

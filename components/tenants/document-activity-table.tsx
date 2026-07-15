@@ -155,7 +155,7 @@ export function DocumentActivityTable({
             </p>
           ) : (
             <div className={cn("min-h-0 overflow-auto", maxHeightClassName)}>
-              <table className="w-full min-w-[640px] text-left text-sm">
+              <table className="w-full text-left text-sm">
                 <thead className="sticky top-0 z-10 border-b bg-muted/80 text-xs uppercase tracking-wide text-muted-foreground backdrop-blur">
                   <tr>
                     <th className="px-4 py-2.5 font-medium">When</th>

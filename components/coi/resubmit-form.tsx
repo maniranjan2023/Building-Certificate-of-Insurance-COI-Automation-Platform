@@ -4,15 +4,20 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CloudUpload, RefreshCw } from "lucide-react";
 import { LoadingButton } from "@/components/ui/loading-button";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 interface ResubmitFormProps {
   documentId: string;
   senderEmail: string;
+  /** When true, skip the outer card chrome (parent already provides a section). */
+  embedded?: boolean;
 }
 
-export function ResubmitForm({ documentId, senderEmail }: ResubmitFormProps) {
+export function ResubmitForm({
+  documentId,
+  senderEmail,
+  embedded = false,
+}: ResubmitFormProps) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -66,18 +71,11 @@ export function ResubmitForm({ documentId, senderEmail }: ResubmitFormProps) {
     }
   }
 
-  return (
-    <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-      <div className="border-b px-4 py-3">
-        <div className="flex items-center gap-2">
-          <RefreshCw className="size-4 text-primary" />
-          <h2 className="font-semibold tracking-tight">Upload next version</h2>
-        </div>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          Resubmit for {senderEmail}
-        </p>
-      </div>
-      <form onSubmit={handleSubmit} className="space-y-3 p-4">
+  const form = (
+      <form onSubmit={handleSubmit} className={cn("space-y-3", !embedded && "p-4")}>
+        {!embedded ? null : (
+          <p className="text-xs text-muted-foreground">Resubmit for {senderEmail}</p>
+        )}
         <div
           role="button"
           tabIndex={0}
@@ -119,7 +117,9 @@ export function ResubmitForm({ documentId, senderEmail }: ResubmitFormProps) {
         </div>
 
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
-        {success ? <p className="text-sm text-emerald-400">{success}</p> : null}
+        {success ? (
+          <p className="text-sm text-emerald-600 dark:text-emerald-400">{success}</p>
+        ) : null}
 
         <LoadingButton
           type="submit"
@@ -132,6 +132,24 @@ export function ResubmitForm({ documentId, senderEmail }: ResubmitFormProps) {
           Upload next version
         </LoadingButton>
       </form>
+  );
+
+  if (embedded) {
+    return form;
+  }
+
+  return (
+    <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+      <div className="border-b px-4 py-3">
+        <div className="flex items-center gap-2">
+          <RefreshCw className="size-4 text-primary" />
+          <h2 className="font-semibold tracking-tight">Upload next version</h2>
+        </div>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          Resubmit for {senderEmail}
+        </p>
+      </div>
+      {form}
     </section>
   );
 }

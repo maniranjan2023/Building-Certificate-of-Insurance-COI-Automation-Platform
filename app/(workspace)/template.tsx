@@ -1,15 +1,11 @@
 /**
  * Soft transition when swapping page segments inside the shared workspace shell.
- * Keeps the sidebar stable while content refreshes with route skeletons.
+ * Visual loading polish is handled by WorkspacePageTransition in the shell.
  */
 export default function WorkspaceTemplate({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return (
-    <div className="animate-in fade-in duration-200 fill-mode-both">
-      {children}
-    </div>
-  );
+  return <div className="min-w-0">{children}</div>;
 }

@@ -7,6 +7,7 @@ import {
   NavigationProgressBar,
 } from "@/components/layout/navigation-pending";
 import { RefreshOnRouteChange } from "@/components/layout/refresh-on-route-change";
+import { WorkspacePageTransition } from "@/components/layout/workspace-page-transition";
 import { useStablePathname } from "@/lib/hooks/use-stable-pathname";
 
 interface DashboardShellProps {
@@ -34,7 +35,7 @@ export function DashboardShell({
           <NavigationProgressBar />
           <WorkspaceHeader pathname={pathname} />
           <main className="flex min-w-0 flex-1 flex-col gap-4 overflow-x-hidden bg-muted/20 p-4 md:p-6">
-            <div className="min-w-0">{children}</div>
+            <WorkspacePageTransition>{children}</WorkspacePageTransition>
           </main>
         </div>
       </div>

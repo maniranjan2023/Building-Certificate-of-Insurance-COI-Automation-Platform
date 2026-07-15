@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -13,29 +14,112 @@ import { usePathname } from "next/navigation";
 
 interface NavigationPendingContextValue {
   pendingHref: string | null;
+  isNavigating: boolean;
   setPendingHref: (href: string | null) => void;
+  /** Call once destination page content has painted and is ready to show. */
+  markContentReady: () => void;
 }
+
+const WORKSPACE_HREF =
+  /^\/(dashboard|tenants|checklist|templates|metrics)(\/|$|\?)/;
 
 const NavigationPendingContext = createContext<NavigationPendingContextValue>({
   pendingHref: null,
+  isNavigating: false,
   setPendingHref: () => undefined,
+  markContentReady: () => undefined,
 });
+
+function normalizeHref(href: string): string {
+  const withoutQuery = href.split("?")[0]?.split("#")[0] ?? href;
+  if (withoutQuery.length > 1 && withoutQuery.endsWith("/")) {
+    return withoutQuery.slice(0, -1);
+  }
+  return withoutQuery;
+}
+
+function pathMatchesTarget(pathname: string, target: string): boolean {
+  const path = normalizeHref(pathname);
+  const href = normalizeHref(target);
+  if (path === href) return true;
+  if (href === "/dashboard") return path === "/dashboard";
+  return path.startsWith(`${href}/`);
+}
 
 export function NavigationPendingProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [pendingHref, setPendingHrefState] = useState<string | null>(null);
+  const [isNavigating, setIsNavigating] = useState(false);
+  const pendingHrefRef = useRef<string | null>(null);
 
-  const setPendingHref = useCallback((href: string | null) => {
-    setPendingHrefState(href);
-  }, []);
+  const setPendingHref = useCallback(
+    (href: string | null) => {
+      if (!href) {
+        pendingHrefRef.current = null;
+        setPendingHrefState(null);
+        setIsNavigating(false);
+        return;
+      }
 
-  useEffect(() => {
+      const next = normalizeHref(href);
+      if (pathMatchesTarget(pathname, next)) {
+        return;
+      }
+
+      pendingHrefRef.current = next;
+      setPendingHrefState(next);
+      setIsNavigating(true);
+    },
+    [pathname]
+  );
+
+  const markContentReady = useCallback(() => {
+    if (!pendingHrefRef.current) return;
+    if (!pathMatchesTarget(pathname, pendingHrefRef.current)) return;
+
+    pendingHrefRef.current = null;
     setPendingHrefState(null);
+    setIsNavigating(false);
   }, [pathname]);
 
+  useEffect(() => {
+    function onDocumentClick(event: MouseEvent) {
+      if (event.defaultPrevented || event.button !== 0) return;
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+
+      const anchor = target.closest("a[href]");
+      if (!(anchor instanceof HTMLAnchorElement)) return;
+      if (anchor.target === "_blank" || anchor.hasAttribute("download")) return;
+
+      const href = anchor.getAttribute("href");
+      if (!href || href.startsWith("http") || href.startsWith("mailto:")) return;
+      if (!WORKSPACE_HREF.test(href)) return;
+
+      setPendingHref(href);
+    }
+
+    document.addEventListener("click", onDocumentClick, true);
+    return () => document.removeEventListener("click", onDocumentClick, true);
+  }, [setPendingHref]);
+
+  // Safety: never leave the loader hanging forever if RSC fails silently.
+  useEffect(() => {
+    if (!pendingHref) return;
+    if (!pathMatchesTarget(pathname, pendingHref)) return;
+
+    const timer = window.setTimeout(() => {
+      markContentReady();
+    }, 8000);
+
+    return () => window.clearTimeout(timer);
+  }, [pathname, pendingHref, markContentReady]);
+
   const value = useMemo(
-    () => ({ pendingHref, setPendingHref }),
-    [pendingHref, setPendingHref]
+    () => ({ pendingHref, isNavigating, setPendingHref, markContentReady }),
+    [pendingHref, isNavigating, setPendingHref, markContentReady]
   );
 
   return (
@@ -49,19 +133,20 @@ export function useNavigationPending() {
   return useContext(NavigationPendingContext);
 }
 
-/** Thin progress bar while a sidebar route transition is in flight. */
+/** Animated top progress bar while a workspace route transition is in flight. */
 export function NavigationProgressBar() {
-  const { pendingHref } = useNavigationPending();
-  const active = Boolean(pendingHref);
+  const { isNavigating } = useNavigationPending();
 
   return (
     <div
-      className="pointer-events-none absolute inset-x-0 top-0 z-20 h-0.5 overflow-hidden"
-      aria-hidden={!active}
+      className="pointer-events-none absolute inset-x-0 top-0 z-30 h-1 overflow-hidden bg-transparent"
+      aria-hidden={!isNavigating}
     >
       <div
-        className={`h-full origin-left bg-primary transition-all duration-300 ${
-          active ? "w-full animate-pulse opacity-100" : "w-0 opacity-0"
+        className={`h-full w-1/3 rounded-full bg-primary shadow-[0_0_14px_oklch(0.62_0.19_255/0.5)] transition-opacity duration-200 ${
+          isNavigating
+            ? "animate-[workspace-nav-indeterminate_1.15s_ease-in-out_infinite] opacity-100"
+            : "opacity-0"
         }`}
       />
     </div>
