@@ -18,7 +18,7 @@ import {
 } from "@/lib/services/guardrail-email";
 import { reconcileChecklistResults } from "@/lib/ai/checklist-rules";
 import { buildDocumentBundle, parseDocumentBuffer } from "@/lib/ai/llamaparse";
-import type { ProcessCoiJobData } from "@/lib/queue/coi-queue";
+import type { ProcessCoiJobData } from "@/lib/jobs/types";
 import {
   completeAiRun,
   failAiRun,

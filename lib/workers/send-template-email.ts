@@ -1,5 +1,5 @@
 import { JobStatus } from "@prisma/client";
-import type { SendTemplateEmailJobData } from "@/lib/queue/coi-queue";
+import type { SendTemplateEmailJobData } from "@/lib/jobs/types";
 import { sendTemplatedEmail } from "@/lib/services/email-send";
 import { updateCoiJobStatus } from "@/lib/services/jobs";
 import { prisma } from "@/lib/prisma";

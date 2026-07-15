@@ -9,7 +9,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { assertBufferMatchesMimeType } from "@/lib/security/file-magic";
 import { uploadCoiBuffer, uploadCoiDocument, deleteCloudinaryAsset } from "@/lib/services/cloudinary";
-import { removeCoiJobsFromQueues } from "@/lib/queue/coi-queue";
+import { removeCoiJobsFromQueues } from "@/lib/services/jobs";
 import { createProcessCoiJob } from "@/lib/services/jobs";
 import { findOrCreateSender } from "@/lib/services/sender";
 import {
@@ -125,7 +125,7 @@ async function createCoiRecord(
 async function createSubmissionWithJob(
   document: CoiDocument,
   senderEmail: string,
-  jobOptions?: import("@/lib/queue/coi-queue").EnqueueProcessCoiOptions
+  jobOptions?: import("@/lib/jobs/types").EnqueueProcessCoiOptions
 ): Promise<{ document: CoiDocument; version: CoiVersion; job: CoiJob }> {
   const version = await createCoiVersionForDocument(document.id, senderEmail);
   const job = await createProcessCoiJob(version.id, document.id, {
@@ -162,7 +162,7 @@ export async function createCoiFromBufferWithJob(
   fileName: string,
   mimeType: string,
   senderEmail?: string | null,
-  jobOptions?: import("@/lib/queue/coi-queue").EnqueueProcessCoiOptions
+  jobOptions?: import("@/lib/jobs/types").EnqueueProcessCoiOptions
 ) {
   validateCoiBuffer(buffer, mimeType);
 

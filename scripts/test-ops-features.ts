@@ -1,10 +1,9 @@
 /**
- * Smoke test for Phase 6 ops features (9–16).
+ * Smoke test for ops features after Inngest migration.
  * Run: npm run test:ops
  */
 import { getEnv } from "@/lib/env";
-import { computeBackoffDelayMs } from "@/lib/queue/backoff";
-import { RedisDistributedLock } from "@/lib/queue/redis-lock";
+import { RedisDistributedLock, closeRedisClient } from "@/lib/redis/distributed-lock";
 import {
   checkDatabaseHealth,
   checkQueuesHealth,
@@ -13,7 +12,7 @@ import {
 } from "@/lib/services/health-check";
 import { getQueueMetricsSnapshot } from "@/lib/services/queue-metrics";
 import { listRecentCronScans } from "@/lib/cron/expiry-reminder-cron";
-import { closeRedisClient } from "@/lib/queue/redis-lock";
+import { countDlqEntries } from "@/lib/dlq/redis-dlq";
 
 async function main(): Promise<void> {
   const env = getEnv();
@@ -25,19 +24,28 @@ async function main(): Promise<void> {
   }
 
   record(
-    "Worker concurrency env",
+    "Inngest concurrency env",
     env.WORKER_COI_CONCURRENCY >= 1 && env.WORKER_REMINDER_CONCURRENCY >= 1,
     `coi=${env.WORKER_COI_CONCURRENCY}, reminder=${env.WORKER_REMINDER_CONCURRENCY}`
   );
 
   record(
-    "Email rate limit env",
+    "Reminder throttle env",
     env.REMINDER_EMAIL_RATE_LIMIT_MAX > 0 && env.REMINDER_EMAIL_RATE_LIMIT_MS >= 1000,
     `${env.REMINDER_EMAIL_RATE_LIMIT_MAX}/${env.REMINDER_EMAIL_RATE_LIMIT_MS}ms`
   );
 
-  const backoff = computeBackoffDelayMs(2);
-  record("Backoff jitter", backoff >= env.JOB_BACKOFF_DELAY_MS, `attempt2 delay=${backoff}ms`);
+  record(
+    "Job max attempts",
+    env.JOB_MAX_ATTEMPTS >= 1,
+    `JOB_MAX_ATTEMPTS=${env.JOB_MAX_ATTEMPTS} → Inngest retries=${env.JOB_MAX_ATTEMPTS - 1}`
+  );
+
+  record(
+    "Cron schedule configured",
+    Boolean(env.CRON_SCHEDULE?.trim()),
+    env.CRON_SCHEDULE
+  );
 
   const lock = new RedisDistributedLock("ops-test-lock");
   const acquired = await lock.acquire(30);
@@ -64,9 +72,12 @@ async function main(): Promise<void> {
   const metrics = await getQueueMetricsSnapshot();
   record(
     "Queue metrics snapshot",
-    metrics.queues.length === 4,
-    `${metrics.queues.length} queues sampled`
+    metrics.queues.length >= 2,
+    `${metrics.queues.length} metric groups; redisDlq=${metrics.redisDlqCount}`
   );
+
+  const dlqCount = await countDlqEntries().catch(() => -1);
+  record("Redis DLQ readable", dlqCount >= 0, `count=${dlqCount}`);
 
   const scans = await listRecentCronScans(3);
   record("Cron scan logs readable", Array.isArray(scans), `${scans.length} recent scan(s)`);
@@ -79,6 +90,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((error) => {
-  console.error("Ops test failed:", error);
+  console.error(error);
   process.exit(1);
 });

@@ -1,6 +1,5 @@
-import cron, { type ScheduledTask } from "node-cron";
 import { getEnv } from "@/lib/env";
-import { RedisDistributedLock } from "@/lib/queue/redis-lock";
+import { RedisDistributedLock } from "@/lib/redis/distributed-lock";
 import { structuredLog } from "@/lib/observability/structured-log";
 import { runExpiryReminderScan } from "@/lib/services/reminder-scan";
 import { prisma } from "@/lib/prisma";
@@ -73,48 +72,10 @@ async function runScanWithLogging(options?: {
   }
 }
 
-export function startExpiryReminderCron(
-  onRun?: (result: Awaited<ReturnType<typeof runExpiryReminderScan>>) => void
-): ScheduledTask {
-  const env = getEnv();
-  const schedule = env.CRON_SCHEDULE;
-
-  if (!cron.validate(schedule)) {
-    throw new Error(`Invalid CRON_SCHEDULE: ${schedule}`);
-  }
-
-  const task = cron.schedule(schedule, async () => {
-    const lock = new RedisDistributedLock(LOCK_KEY);
-    const acquired = await lock.acquire(env.CRON_LOCK_TTL_SECONDS);
-
-    if (!acquired) {
-      structuredLog({
-        event: "cron.scan.skipped",
-        level: "warn",
-        message: "lock held by another instance",
-      });
-      await prisma.cronScanLog.create({
-        data: { lockSkipped: true, completedAt: new Date(), durationMs: 0 },
-      });
-      return;
-    }
-
-    lock.startRenewal(env.CRON_LOCK_TTL_SECONDS);
-
-    try {
-      structuredLog({ event: "cron.scan.started" });
-      const result = await runScanWithLogging();
-      onRun?.(result);
-    } catch (error) {
-      console.error("[cron] expiry scan failed:", error);
-    } finally {
-      await lock.release();
-    }
-  });
-
-  return task;
-}
-
+/**
+ * Run expiry reminder scan with distributed lock (used by Inngest cron).
+ * Throws if another scan holds the lock.
+ */
 export async function runExpiryReminderScanOnce(): Promise<
   Awaited<ReturnType<typeof runExpiryReminderScan>>
 > {
@@ -123,6 +84,14 @@ export async function runExpiryReminderScanOnce(): Promise<
   const acquired = await lock.acquire(env.CRON_LOCK_TTL_SECONDS);
 
   if (!acquired) {
+    await prisma.cronScanLog.create({
+      data: { lockSkipped: true, completedAt: new Date(), durationMs: 0 },
+    });
+    structuredLog({
+      event: "cron.scan.skipped",
+      level: "warn",
+      message: "lock held by another instance",
+    });
     throw new Error("Another cron instance is already running the expiry scan.");
   }
 

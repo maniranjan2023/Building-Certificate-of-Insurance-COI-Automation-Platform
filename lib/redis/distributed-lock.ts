@@ -74,21 +74,6 @@ export class RedisDistributedLock {
   }
 }
 
-/** @deprecated Use RedisDistributedLock for token-safe acquire/release. */
-export async function acquireDistributedLock(
-  key: string,
-  ttlSeconds: number
-): Promise<boolean> {
-  const lock = new RedisDistributedLock(key);
-  return lock.acquire(ttlSeconds);
-}
-
-/** @deprecated Use RedisDistributedLock.release(). */
-export async function releaseDistributedLock(key: string): Promise<void> {
-  const redis = getRedisClient();
-  await redis.del(`${LOCK_PREFIX}${key}`);
-}
-
 export async function closeRedisClient(): Promise<void> {
   if (redisClient) {
     await redisClient.quit();

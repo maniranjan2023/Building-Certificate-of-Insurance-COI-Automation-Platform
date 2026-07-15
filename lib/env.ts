@@ -26,17 +26,23 @@ const envSchema = z.object({
 
   REDIS_URL: z.string().optional(),
 
-  BULLMQ_COI_QUEUE: z.string().default("coi-jobs"),
+  /** Maps to Inngest function retries (total attempts = JOB_MAX_ATTEMPTS). */
+  JOB_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(21).default(5),
 
-  BULLMQ_COI_DLQ: z.string().default("coi-jobs-dlq"),
-
-  BULLMQ_REMINDER_QUEUE: z.string().default("reminder-jobs"),
-
-  BULLMQ_REMINDER_DLQ: z.string().default("reminder-jobs-dlq"),
-
-  JOB_MAX_ATTEMPTS: z.coerce.number().int().min(1).default(5),
-
-  JOB_BACKOFF_DELAY_MS: z.coerce.number().int().min(100).default(5000),
+  /**
+   * Official Inngest env vars — read by the SDK automatically.
+   * @see https://www.inngest.com/docs/sdk/environment-variables
+   */
+  INNGEST_EVENT_KEY: z.string().optional(),
+  INNGEST_SIGNING_KEY: z.string().optional(),
+  INNGEST_SIGNING_KEY_FALLBACK: z.string().optional(),
+  INNGEST_DEV: z.string().optional(),
+  INNGEST_BASE_URL: z.string().optional(),
+  INNGEST_ENV: z.string().optional(),
+  INNGEST_SERVE_ORIGIN: z.string().optional(),
+  INNGEST_SERVE_PATH: z.string().optional(),
+  INNGEST_STREAMING: z.enum(["true", "false"]).optional(),
+  INNGEST_LOG_LEVEL: z.string().optional(),
 
   AGENTMAIL_API_KEY: z.string().optional(),
 
@@ -89,7 +95,7 @@ const envSchema = z.object({
   HOURLY_RATE_USD: z.coerce.number().min(0).default(45),
   PLATFORM_COST_ANNUAL_USD: z.coerce.number().min(0).default(1200),
 
-  /** Phase 6 — worker throughput & reliability */
+  /** Phase 6 — Inngest concurrency / reminder throttle (flow control) */
   WORKER_COI_CONCURRENCY: z.coerce.number().int().min(1).max(20).default(2),
   WORKER_REMINDER_CONCURRENCY: z.coerce.number().int().min(1).max(20).default(3),
   REMINDER_EMAIL_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(100),

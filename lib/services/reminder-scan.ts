@@ -1,6 +1,7 @@
 import { CoiStatus, JobStatus, JobType } from "@prisma/client";
-import { getEnv, getReminderDaysBefore } from "@/lib/env";
-import { enqueueSendReminderJobsBulk } from "@/lib/queue/reminder-queue";
+import { getReminderDaysBefore } from "@/lib/env";
+import { enqueueSendReminderJobsBulk } from "@/lib/services/jobs";
+import { INNGEST_REMINDER_QUEUE } from "@/lib/jobs/types";
 import { backfillExpirationDatesForReminderScan } from "@/lib/services/expiration-date-sync";
 import { prisma } from "@/lib/prisma";
 import {
@@ -40,7 +41,6 @@ function reminderLogKey(coiDocumentId: string, daysBefore: number): string {
 }
 
 export async function runExpiryReminderScan(): Promise<ExpiryScanResult> {
-  const env = getEnv();
   const reminderDays = getReminderDaysBefore();
   const today = startOfDay(new Date());
   const windowEnd = addDays(today, 30);
@@ -207,7 +207,7 @@ export async function runExpiryReminderScan(): Promise<ExpiryScanResult> {
         data: {
           coiVersionId: item.coiVersionId,
           coiDocumentId: item.coiDocumentId,
-          queueName: env.BULLMQ_REMINDER_QUEUE,
+          queueName: INNGEST_REMINDER_QUEUE,
           type: JobType.SEND_REMINDER,
           status: JobStatus.QUEUED,
         },

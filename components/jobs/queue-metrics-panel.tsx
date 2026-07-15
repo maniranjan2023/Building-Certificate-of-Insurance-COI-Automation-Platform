@@ -97,7 +97,7 @@ export function QueueMetricsPanel() {
               Live queue monitoring
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
-              Redis BullMQ depth + database job status (refreshes on demand)
+              Inngest job status + Redis DLQ depth (refreshes on demand)
             </p>
           </div>
           <Button

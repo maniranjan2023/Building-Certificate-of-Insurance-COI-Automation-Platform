@@ -37,7 +37,7 @@ export const dashboardNavigation: NavSection[] = [
       {
         href: "/dashboard/jobs",
         label: "Job Queue",
-        description: "BullMQ status & DLQ",
+        description: "Inngest jobs & Redis DLQ",
         icon: ListTodo,
         enabled: true,
       },

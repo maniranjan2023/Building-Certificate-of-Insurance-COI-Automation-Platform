@@ -1,7 +1,7 @@
 import { JobStatus } from "@prisma/client";
 import { runCoiAiPipeline } from "@/lib/ai/pipeline";
 import { isDlqTestMode } from "@/lib/env";
-import type { ProcessCoiJobData } from "@/lib/queue/coi-queue";
+import type { ProcessCoiJobData } from "@/lib/jobs/types";
 import { sendAutoIntakeEmail } from "@/lib/services/intake-email";
 import { enqueueSendTemplateEmailJob } from "@/lib/services/jobs";
 import { updateCoiJobStatus } from "@/lib/services/jobs";

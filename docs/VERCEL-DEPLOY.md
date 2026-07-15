@@ -59,7 +59,8 @@ DIRECT_URL=...          # Neon direct connection (migrations)
 3. Connect Redis (Upstash recommended) and set `REDIS_URL`.
 4. Run `npx prisma db push` or migrations against production DB once.
 5. Redeploy after env changes (Vercel → Deployments → Redeploy).
-6. Worker/cron (`npm run worker`, `npm run cron`) run **outside** Vercel — use Railway, Fly.io, or a VPS.
+6. Background jobs and cron run via **Inngest** on `/api/inngest` (same Vercel deployment). Set `INNGEST_EVENT_KEY` + `INNGEST_SIGNING_KEY`. See `BACKGROUND_JOB_ARCHITECTURE.md`.
+   - Do **not** run separate Docker worker/cron containers.
 
 ## Verify after deploy
 

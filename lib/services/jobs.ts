@@ -1,14 +1,17 @@
 import { JobStatus, JobType, type CoiJob, type Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { inngest } from "@/inngest/client";
 import {
-  enqueueProcessCoiJob,
-  enqueueSendTemplateEmailJob as queueSendTemplateEmail,
+  processCoiRequested,
+  sendReminderRequested,
+  sendTemplateEmailRequested,
+} from "@/inngest/events";
+import {
+  INNGEST_COI_QUEUE,
   type EnqueueProcessCoiOptions,
-} from "@/lib/queue/coi-queue";
-import { enqueueSendReminderJob, getReminderDlqQueue } from "@/lib/queue/reminder-queue";
-import { getCoiDlqQueue } from "@/lib/queue/coi-queue";
-import { isReminderQueue } from "@/lib/constants/job-type";
-import { getEnv } from "@/lib/env";
+} from "@/lib/jobs/types";
+import { isDlqTestMode } from "@/lib/env";
+import { deleteDlqEntry, getDlqEntry } from "@/lib/dlq/redis-dlq";
 
 export { JOB_STATUS_LABELS } from "@/lib/constants/job-status";
 
@@ -31,55 +34,138 @@ export type CoiJobWithRelations = Prisma.CoiJobGetPayload<{
   };
 }>;
 
+function firstEventId(result: { ids?: string[] }, fallback: string): string {
+  return result.ids?.[0] ?? fallback;
+}
+
 export async function createProcessCoiJob(
   coiVersionId: string,
   coiDocumentId: string,
   options?: EnqueueProcessCoiOptions
 ): Promise<CoiJob> {
-  const env = getEnv();
   const job = await prisma.coiJob.create({
     data: {
       coiVersionId,
       coiDocumentId,
-      queueName: env.BULLMQ_COI_QUEUE,
+      queueName: INNGEST_COI_QUEUE,
       type: JobType.PROCESS_COI,
       status: JobStatus.QUEUED,
     },
   });
 
-  const bullmqJobId = await enqueueProcessCoiJob(
-    job.id,
+  const forceFail = options?.forceFail ?? isDlqTestMode();
+  const event = processCoiRequested.create({
+    coiJobId: job.id,
     coiDocumentId,
     coiVersionId,
-    options
-  );
+    ...(forceFail ? { forceFail: true } : {}),
+    ...(options?.emailBodyText ? { emailBodyText: options.emailBodyText } : {}),
+    ...(options?.agentMailMessageId
+      ? { agentMailMessageId: options.agentMailMessageId }
+      : {}),
+    ...(options?.agentMailInboxId
+      ? { agentMailInboxId: options.agentMailInboxId }
+      : {}),
+    ...(options?.senderEmail ? { senderEmail: options.senderEmail } : {}),
+  });
+
+  const result = await inngest.send(event);
 
   return prisma.coiJob.update({
     where: { id: job.id },
-    data: { bullmqJobId },
+    data: { bullmqJobId: firstEventId(result, job.id) },
   });
 }
 
 export async function enqueueSendTemplateEmailJob(
   data: SendTemplateEmailEnqueueData
 ): Promise<CoiJob> {
-  const env = getEnv();
   const job = await prisma.coiJob.create({
     data: {
       coiVersionId: data.coiVersionId,
       coiDocumentId: data.coiDocumentId,
-      queueName: env.BULLMQ_COI_QUEUE,
+      queueName: INNGEST_COI_QUEUE,
       type: JobType.SEND_TEMPLATE_EMAIL,
       status: JobStatus.QUEUED,
     },
   });
 
-  const bullmqJobId = await queueSendTemplateEmail(job.id, data);
+  const event = sendTemplateEmailRequested.create({
+    coiJobId: job.id,
+    coiVersionId: data.coiVersionId,
+    coiDocumentId: data.coiDocumentId,
+    templateKey: data.templateKey,
+    toEmail: data.toEmail,
+    ...(data.customBody ? { customBody: data.customBody } : {}),
+    ...(data.customSubject ? { customSubject: data.customSubject } : {}),
+    ...(data.rejectionReason ? { rejectionReason: data.rejectionReason } : {}),
+    ...(data.agentMailMessageId
+      ? { agentMailMessageId: data.agentMailMessageId }
+      : {}),
+    ...(data.agentMailInboxId
+      ? { agentMailInboxId: data.agentMailInboxId }
+      : {}),
+  });
+
+  const result = await inngest.send(event);
 
   return prisma.coiJob.update({
     where: { id: job.id },
-    data: { bullmqJobId },
+    data: { bullmqJobId: firstEventId(result, job.id) },
   });
+}
+
+export async function enqueueSendReminderJob(
+  coiJobId: string,
+  data: {
+    coiVersionId: string;
+    coiDocumentId: string;
+    daysBefore: number;
+    toEmail: string;
+  }
+): Promise<string> {
+  const event = sendReminderRequested.create(
+    {
+      coiJobId,
+      coiVersionId: data.coiVersionId,
+      coiDocumentId: data.coiDocumentId,
+      daysBefore: data.daysBefore,
+      toEmail: data.toEmail,
+    },
+    { id: `reminder-${data.coiDocumentId}-${data.daysBefore}` }
+  );
+
+  const result = await inngest.send(event);
+  return firstEventId(result, coiJobId);
+}
+
+export async function enqueueSendReminderJobsBulk(
+  jobs: Array<{
+    coiJobId: string;
+    coiVersionId: string;
+    coiDocumentId: string;
+    daysBefore: number;
+    toEmail: string;
+  }>
+): Promise<string[]> {
+  if (!jobs.length) return [];
+
+  const events = jobs.map((job) =>
+    sendReminderRequested.create(
+      {
+        coiJobId: job.coiJobId,
+        coiVersionId: job.coiVersionId,
+        coiDocumentId: job.coiDocumentId,
+        daysBefore: job.daysBefore,
+        toEmail: job.toEmail,
+      },
+      { id: `reminder-${job.coiDocumentId}-${job.daysBefore}` }
+    )
+  );
+
+  const result = await inngest.send(events);
+  const ids = result.ids ?? [];
+  return jobs.map((job, index) => ids[index] ?? job.coiJobId);
 }
 
 export async function listCoiJobs(): Promise<CoiJobWithRelations[]> {
@@ -92,7 +178,9 @@ export async function listCoiJobs(): Promise<CoiJobWithRelations[]> {
   });
 }
 
-export async function listDlqJobs(filter?: "all" | "coi" | "reminder"): Promise<CoiJobWithRelations[]> {
+export async function listDlqJobs(
+  filter?: "all" | "coi" | "reminder"
+): Promise<CoiJobWithRelations[]> {
   const where =
     filter === "reminder"
       ? { status: JobStatus.DLQ, queueName: { contains: "reminder" } }
@@ -147,7 +235,10 @@ export async function retryJobFromDlq(coiJobId: string): Promise<CoiJob> {
     throw new Error("Job is missing coiVersionId.");
   }
 
-  const bullmqJobId = `${existing.id}-retry-${Date.now()}`;
+  const dlqEntry = await getDlqEntry(coiJobId);
+  const payload = dlqEntry?.payload ?? {};
+
+  let eventId = existing.id;
 
   if (existing.type === JobType.SEND_REMINDER) {
     const version = await prisma.coiVersion.findUnique({
@@ -160,34 +251,77 @@ export async function retryJobFromDlq(coiJobId: string): Promise<CoiJob> {
     }
 
     const toEmail =
-      version.coiDocument.senderEmail?.trim().toLowerCase() ?? version.sender.email;
-    const daysBefore = await resolveReminderDaysBefore(existing);
+      (typeof payload.toEmail === "string" && payload.toEmail) ||
+      version.coiDocument.senderEmail?.trim().toLowerCase() ||
+      version.sender.email;
+    const daysBefore =
+      typeof payload.daysBefore === "number" && payload.daysBefore > 0
+        ? payload.daysBefore
+        : await resolveReminderDaysBefore(existing);
 
-    const enqueuedId = await enqueueSendReminderJob(existing.id, {
+    eventId = await enqueueSendReminderJob(existing.id, {
       coiVersionId: existing.coiVersionId,
       coiDocumentId: existing.coiDocumentId,
       daysBefore,
       toEmail,
     });
+  } else if (existing.type === JobType.SEND_TEMPLATE_EMAIL) {
+    const templateKey =
+      typeof payload.templateKey === "string" ? payload.templateKey : null;
+    const toEmail = typeof payload.toEmail === "string" ? payload.toEmail : null;
 
-    return prisma.coiJob.update({
-      where: { id: existing.id },
-      data: {
-        status: JobStatus.QUEUED,
-        attempts: 0,
-        failureReason: null,
-        dlqJobId: null,
-        bullmqJobId: enqueuedId,
-      },
+    if (!templateKey || !toEmail) {
+      throw new Error("DLQ payload missing templateKey/toEmail for email retry.");
+    }
+
+    const event = sendTemplateEmailRequested.create({
+      coiJobId: existing.id,
+      coiVersionId: existing.coiVersionId,
+      coiDocumentId: existing.coiDocumentId,
+      templateKey,
+      toEmail,
+      ...(typeof payload.customBody === "string"
+        ? { customBody: payload.customBody }
+        : {}),
+      ...(typeof payload.customSubject === "string"
+        ? { customSubject: payload.customSubject }
+        : {}),
+      ...(typeof payload.rejectionReason === "string"
+        ? { rejectionReason: payload.rejectionReason }
+        : {}),
+      ...(typeof payload.agentMailMessageId === "string"
+        ? { agentMailMessageId: payload.agentMailMessageId }
+        : {}),
+      ...(typeof payload.agentMailInboxId === "string"
+        ? { agentMailInboxId: payload.agentMailInboxId }
+        : {}),
     });
+    const result = await inngest.send(event);
+    eventId = firstEventId(result, existing.id);
+  } else {
+    const event = processCoiRequested.create({
+      coiJobId: existing.id,
+      coiDocumentId: existing.coiDocumentId,
+      coiVersionId: existing.coiVersionId,
+      forceFail: false,
+      ...(typeof payload.emailBodyText === "string"
+        ? { emailBodyText: payload.emailBodyText }
+        : {}),
+      ...(typeof payload.agentMailMessageId === "string"
+        ? { agentMailMessageId: payload.agentMailMessageId }
+        : {}),
+      ...(typeof payload.agentMailInboxId === "string"
+        ? { agentMailInboxId: payload.agentMailInboxId }
+        : {}),
+      ...(typeof payload.senderEmail === "string"
+        ? { senderEmail: payload.senderEmail }
+        : {}),
+    });
+    const result = await inngest.send(event);
+    eventId = firstEventId(result, existing.id);
   }
 
-  const enqueuedId = await enqueueProcessCoiJob(
-    existing.id,
-    existing.coiDocumentId,
-    existing.coiVersionId,
-    { forceFail: false, bullmqJobId }
-  );
+  await deleteDlqEntry(coiJobId);
 
   return prisma.coiJob.update({
     where: { id: existing.id },
@@ -196,31 +330,17 @@ export async function retryJobFromDlq(coiJobId: string): Promise<CoiJob> {
       attempts: 0,
       failureReason: null,
       dlqJobId: null,
-      bullmqJobId: enqueuedId,
+      bullmqJobId: eventId,
     },
   });
 }
 
 async function resolveReminderDaysBefore(job: CoiJob): Promise<number> {
-  if (job.dlqJobId) {
-    try {
-      const dlq = getReminderDlqQueue();
-      const dlqJob = await dlq.getJob(job.dlqJobId);
-      const daysBefore = dlqJob?.data?.daysBefore;
-      if (typeof daysBefore === "number" && daysBefore > 0) {
-        return daysBefore;
-      }
-    } catch {
-      // Fall through to default.
-    }
-  }
-
   const log = await prisma.reminderLog.findFirst({
     where: { coiJobId: job.id },
     select: { daysBefore: true },
   });
   if (log) return log.daysBefore;
-
   return 30;
 }
 
@@ -235,24 +355,7 @@ export async function dismissDlqJob(coiJobId: string): Promise<CoiJob> {
     throw new Error("Only DLQ jobs can be dismissed.");
   }
 
-  const dlq = isReminderQueue(existing.queueName)
-    ? getReminderDlqQueue()
-    : getCoiDlqQueue();
-
-  const candidateIds = new Set(
-    [existing.dlqJobId, `dlq-${existing.id}`].filter((value): value is string =>
-      Boolean(value)
-    )
-  );
-
-  for (const bullId of candidateIds) {
-    try {
-      const dead = await dlq.getJob(bullId);
-      if (dead) await dead.remove();
-    } catch {
-      // DLQ entry may already be gone.
-    }
-  }
+  await deleteDlqEntry(coiJobId);
 
   return prisma.coiJob.update({
     where: { id: existing.id },
@@ -262,4 +365,16 @@ export async function dismissDlqJob(coiJobId: string): Promise<CoiJob> {
       dlqJobId: null,
     },
   });
+}
+
+/** Remove Redis DLQ entries when a COI document is deleted. */
+export async function removeCoiJobsFromQueues(
+  jobs: Array<{ id: string; bullmqJobId: string | null; dlqJobId: string | null }>
+): Promise<void> {
+  for (const job of jobs) {
+    await deleteDlqEntry(job.id).catch(() => undefined);
+    if (job.dlqJobId && job.dlqJobId !== job.id) {
+      await deleteDlqEntry(job.dlqJobId).catch(() => undefined);
+    }
+  }
 }

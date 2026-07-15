@@ -4,8 +4,8 @@ import path from "path";
 const nextConfig: NextConfig = {
   outputFileTracingRoot: path.join(__dirname),
   serverExternalPackages: [
-    "bullmq",
     "ioredis",
+    "inngest",
     "agentmail",
     "@pydantic/logfire-node",
     "logfire",
