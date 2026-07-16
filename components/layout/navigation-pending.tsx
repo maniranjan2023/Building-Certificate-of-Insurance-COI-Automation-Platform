@@ -21,7 +21,7 @@ interface NavigationPendingContextValue {
 }
 
 const WORKSPACE_HREF =
-  /^\/(dashboard|tenants|checklist|templates|metrics)(\/|$|\?)/;
+  /^\/(dashboard|tenants|checklist|templates|metrics|docs)(\/|$|\?)/;
 
 const NavigationPendingContext = createContext<NavigationPendingContextValue>({
   pendingHref: null,

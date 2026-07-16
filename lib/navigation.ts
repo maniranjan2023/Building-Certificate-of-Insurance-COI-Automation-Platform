@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  BookOpen,
   ClipboardCheck,
   History,
   LayoutDashboard,
@@ -16,6 +17,8 @@ export interface NavItem {
   icon: LucideIcon;
   enabled: boolean;
   badge?: string;
+  /** When true, sidebar opens this link in a new browser tab. */
+  openInNewTab?: boolean;
 }
 
 export interface NavSection {
@@ -47,6 +50,14 @@ export const dashboardNavigation: NavSection[] = [
         description: "Uploads, emails & AI logs",
         icon: History,
         enabled: true,
+      },
+      {
+        href: "/docs",
+        label: "How to use this platform",
+        description: "Email & upload steps for admins",
+        icon: BookOpen,
+        enabled: true,
+        openInNewTab: true,
       },
     ],
   },

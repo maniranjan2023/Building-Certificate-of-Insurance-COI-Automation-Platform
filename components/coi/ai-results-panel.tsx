@@ -9,6 +9,14 @@ import {
   ChecklistResultsTable,
   parseChecklistResults,
 } from "@/components/coi/checklist-results-table";
+import { ExpandableText } from "@/components/ui/expandable-text";
+import {
+  FileSearch,
+  ShieldAlert,
+  FileText,
+  SearchCheck,
+} from "lucide-react";
+import type { ReactNode } from "react";
 
 interface AiResultsPanelProps {
   version: {
@@ -65,6 +73,14 @@ function asReport(value: unknown): ReportAgentOutput | null {
   };
 }
 
+function SectionIcon({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-blue-600/10 text-blue-600">
+      {children}
+    </div>
+  );
+}
+
 export function AiResultsPanel({
   version,
   aiRun,
@@ -88,10 +104,17 @@ export function AiResultsPanel({
     return (
       <Card className="gap-3 py-4">
         <CardHeader className="gap-1 px-4 pb-0">
-          <CardTitle className="text-lg">AI analysis</CardTitle>
-          <CardDescription className="text-sm">
-            Results appear here after the worker completes the Phase 4 pipeline.
-          </CardDescription>
+          <div className="flex items-center gap-3">
+            <SectionIcon>
+              <SearchCheck className="size-4" />
+            </SectionIcon>
+            <div>
+              <CardTitle className="text-lg">Analysis</CardTitle>
+              <CardDescription className="text-sm">
+                Results appear here after the worker finishes processing.
+              </CardDescription>
+            </div>
+          </div>
         </CardHeader>
       </Card>
     );
@@ -100,13 +123,18 @@ export function AiResultsPanel({
   return (
     <div className="min-w-0 space-y-4">
       <section className="min-w-0 overflow-hidden rounded-2xl border bg-card shadow-sm">
-        <div className="border-b px-5 py-4">
-          <h2 className="text-lg font-semibold tracking-tight">AI analysis</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {version.aiSuggestedTemplate
-              ? `Suggested template: ${version.aiSuggestedTemplate.replace(/_/g, " ")}`
-              : "Pipeline output from document → extraction → checklist → risk → report"}
-          </p>
+        <div className="flex items-start gap-3 border-b px-5 py-4">
+          <SectionIcon>
+            <SearchCheck className="size-4" />
+          </SectionIcon>
+          <div className="min-w-0">
+            <h2 className="text-lg font-semibold tracking-tight">Analysis</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {version.aiSuggestedTemplate
+                ? `Suggested template: ${version.aiSuggestedTemplate.replace(/_/g, " ")}`
+                : "Output from extraction, checklist, risk, and draft report"}
+            </p>
+          </div>
         </div>
         {aiRun ? (
           <div className="px-5 py-4 text-sm">
@@ -122,9 +150,14 @@ export function AiResultsPanel({
       {extraction ? (
         <Card className="gap-3 py-4">
           <CardHeader className="gap-1 px-4 pb-0">
-            <CardTitle className="text-lg">Important details</CardTitle>
+            <div className="flex items-center gap-3">
+              <SectionIcon>
+                <FileSearch className="size-4" />
+              </SectionIcon>
+              <CardTitle className="text-lg">Important details</CardTitle>
+            </div>
           </CardHeader>
-          <CardContent className="grid gap-2 px-4 pb-4 text-sm sm:grid-cols-2">
+          <CardContent className="grid gap-2 px-4 pb-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
             {(
               [
                 ["Carrier", extraction.carrierName],
@@ -137,9 +170,18 @@ export function AiResultsPanel({
                 ["GL limit", extraction.generalLiabilityLimit],
               ] as const
             ).map(([label, value]) => (
-              <div key={label}>
+              <div key={label} className="min-w-0">
                 <p className="text-muted-foreground">{label}</p>
-                <p className="font-medium">{value ?? "—"}</p>
+                {value ? (
+                  <ExpandableText
+                    text={value}
+                    title={label}
+                    clampClassName="line-clamp-2"
+                    className="font-medium text-foreground"
+                  />
+                ) : (
+                  <p className="font-medium">—</p>
+                )}
               </div>
             ))}
           </CardContent>
@@ -153,7 +195,12 @@ export function AiResultsPanel({
       {risk ? (
         <Card className="gap-3 py-4">
           <CardHeader className="gap-1 px-4 pb-0">
-            <CardTitle className="text-lg">Risk analysis</CardTitle>
+            <div className="flex items-center gap-3">
+              <SectionIcon>
+                <ShieldAlert className="size-4" />
+              </SectionIcon>
+              <CardTitle className="text-lg">Risk analysis</CardTitle>
+            </div>
           </CardHeader>
           <CardContent className="space-y-2 px-4 pb-4 text-sm">
             <p>
@@ -174,20 +221,44 @@ export function AiResultsPanel({
       {report ? (
         <Card className="gap-3 py-4">
           <CardHeader className="gap-1 px-4 pb-0">
-            <CardTitle className="text-lg">Draft report</CardTitle>
-            <CardDescription className="text-sm">
-              Edit before sending tenant notification
-            </CardDescription>
+            <div className="flex items-center gap-3">
+              <SectionIcon>
+                <FileText className="size-4" />
+              </SectionIcon>
+              <div>
+                <CardTitle className="text-lg">Draft report</CardTitle>
+                <CardDescription className="text-sm">
+                  Edit before sending tenant notification
+                </CardDescription>
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="space-y-3 px-4 pb-4 text-sm">
-            <p>{report.summary}</p>
-            <p className="text-muted-foreground">{report.recommendationReason}</p>
+            <ExpandableText
+              text={report.summary}
+              title="Report summary"
+              clampClassName="line-clamp-3"
+            />
+            {report.recommendationReason ? (
+              <ExpandableText
+                text={report.recommendationReason}
+                title="Recommendation reason"
+                clampClassName="line-clamp-2"
+                className="text-muted-foreground"
+              />
+            ) : null}
             {report.missingItems.length > 0 ? (
               <div>
                 <p className="font-medium">Missing / failed items</p>
-                <ul className="mt-1 list-inside list-disc text-muted-foreground">
+                <ul className="mt-1 space-y-1 text-muted-foreground">
                   {report.missingItems.map((item) => (
-                    <li key={item}>{item}</li>
+                    <li key={item} className="list-inside list-disc">
+                      <ExpandableText
+                        text={item}
+                        title="Missing item"
+                        clampClassName="line-clamp-1"
+                      />
+                    </li>
                   ))}
                 </ul>
               </div>

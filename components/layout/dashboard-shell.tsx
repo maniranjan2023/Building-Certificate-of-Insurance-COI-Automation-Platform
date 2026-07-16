@@ -2,6 +2,7 @@
 
 import { SessionNavBar, SESSION_NAVBAR_WIDTH } from "@/components/ui/session-nav-bar";
 import { WorkspaceHeader } from "@/components/layout/workspace-header";
+import { DocsOnboardingBanner } from "@/components/layout/docs-onboarding-banner";
 import { NavigationPendingProvider } from "@/components/layout/navigation-pending";
 import { RefreshOnRouteChange } from "@/components/layout/refresh-on-route-change";
 import { WorkspacePageTransition } from "@/components/layout/workspace-page-transition";
@@ -30,6 +31,7 @@ export function DashboardShell({
           style={{ marginLeft: SESSION_NAVBAR_WIDTH }}
         >
           <WorkspaceHeader pathname={pathname} />
+          <DocsOnboardingBanner />
           <main className="flex min-w-0 flex-1 flex-col gap-4 overflow-x-hidden bg-muted/20 p-4 md:p-6">
             <WorkspacePageTransition>{children}</WorkspacePageTransition>
           </main>

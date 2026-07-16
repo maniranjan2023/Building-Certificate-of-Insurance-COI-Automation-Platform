@@ -76,20 +76,26 @@ export function JobsPageSkeleton() {
 export function CoiDetailSkeleton() {
   return (
     <div
-      className="mx-auto min-w-0 max-w-6xl space-y-6"
+      className="min-w-0 w-full space-y-5"
       aria-busy="true"
       aria-label="Loading submission"
     >
       <section className="rounded-2xl border bg-card p-5 shadow-sm md:p-6">
-        <Skeleton className="h-8 w-2/3 max-w-md" />
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Skeleton className="h-6 w-24 rounded-full" />
-          <Skeleton className="h-6 w-28 rounded-full" />
-          <Skeleton className="h-6 w-20 rounded-full" />
+        <div className="flex gap-4">
+          <Skeleton className="size-12 shrink-0 rounded-xl md:size-14" />
+          <div className="min-w-0 flex-1 space-y-3">
+            <Skeleton className="h-3 w-40" />
+            <Skeleton className="h-8 w-2/3 max-w-md" />
+            <div className="flex flex-wrap gap-2">
+              <Skeleton className="h-6 w-24 rounded-full" />
+              <Skeleton className="h-6 w-28 rounded-full" />
+              <Skeleton className="h-6 w-20 rounded-full" />
+            </div>
+          </div>
         </div>
       </section>
 
-      <div className="grid min-w-0 gap-4 lg:grid-cols-2">
+      <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)]">
         <section className="rounded-2xl border bg-card p-5 shadow-sm">
           <Skeleton className="h-5 w-36" />
           <Skeleton className="mt-1 h-3 w-56" />
@@ -106,14 +112,12 @@ export function CoiDetailSkeleton() {
       <section className="rounded-2xl border bg-card p-5 shadow-sm md:p-6">
         <Skeleton className="h-5 w-48" />
         <Skeleton className="mt-2 h-4 w-72 max-w-full" />
-        <div className="mt-4 space-y-3">
-          {Array.from({ length: 5 }, (_, index) => (
-            <div key={index} className="flex items-start gap-3">
-              <Skeleton className="size-7 shrink-0 rounded-full" />
-              <div className="min-w-0 flex-1 space-y-2">
-                <Skeleton className="h-4 w-40" />
-                <Skeleton className="h-3 w-full max-w-sm" />
-              </div>
+        <div className="mt-4 flex gap-3 overflow-hidden">
+          {Array.from({ length: 6 }, (_, index) => (
+            <div key={index} className="flex w-28 shrink-0 flex-col items-center gap-2">
+              <Skeleton className="size-7 rounded-full" />
+              <Skeleton className="h-3 w-20" />
+              <Skeleton className="h-2 w-16" />
             </div>
           ))}
         </div>
@@ -310,6 +314,29 @@ export function CronScanSkeleton() {
   );
 }
 
+export function DocsPageSkeleton() {
+  return (
+    <div className="space-y-4" aria-busy="true" aria-label="Loading docs">
+      <PageHeaderSkeleton />
+      <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
+        <div className="space-y-2 rounded-2xl border bg-card p-2">
+          {Array.from({ length: 5 }, (_, index) => (
+            <Skeleton key={index} className="h-9 w-full" />
+          ))}
+        </div>
+        <section className="rounded-2xl border bg-card p-5 shadow-sm md:p-6">
+          <Skeleton className="h-6 w-40" />
+          <div className="mt-4 space-y-3">
+            {Array.from({ length: 4 }, (_, index) => (
+              <Skeleton key={index} className="h-16 w-full rounded-xl" />
+            ))}
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
 /** Pick the matching shadcn page skeleton for a workspace href. */
 export function resolveShadcnPageSkeleton(href: string) {
   if (href.startsWith("/dashboard/jobs")) return <JobsPageSkeleton />;
@@ -321,5 +348,6 @@ export function resolveShadcnPageSkeleton(href: string) {
   if (href.startsWith("/checklist")) return <ChecklistPageSkeleton />;
   if (href.startsWith("/templates")) return <TemplatesPageSkeleton />;
   if (href.startsWith("/metrics")) return <MetricsPageSkeleton />;
+  if (href.startsWith("/docs")) return <DocsPageSkeleton />;
   return <DashboardPortfolioSkeleton />;
 }

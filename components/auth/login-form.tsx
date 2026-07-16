@@ -1,15 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { resetDocsBannerForLogin } from "@/components/layout/docs-onboarding-banner";
 
 export function LoginForm() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -32,13 +32,14 @@ export function LoginForm() {
         throw new Error(payload.error ?? "Invalid credentials");
       }
 
-      router.push("/dashboard");
-      router.refresh();
+      // Show the how-to banner on the next workspace load until the admin dismisses it.
+      resetDocsBannerForLogin();
+      window.location.assign("/dashboard");
+      return;
     } catch (loginError) {
       setError(
         loginError instanceof Error ? loginError.message : "Login failed"
       );
-    } finally {
       setIsSubmitting(false);
     }
   }
@@ -57,9 +58,15 @@ export function LoginForm() {
         </div>
       </CardHeader>
       <CardContent className="p-4 pt-0">
-        <form onSubmit={handleSubmit} className="space-y-3">
+        <form
+          onSubmit={handleSubmit}
+          className="space-y-3"
+          aria-busy={isSubmitting || undefined}
+        >
           <div className="space-y-1.5">
-            <Label htmlFor="email" className="text-sm">Email</Label>
+            <Label htmlFor="email" className="text-sm">
+              Email
+            </Label>
             <Input
               id="email"
               type="email"
@@ -67,11 +74,14 @@ export function LoginForm() {
               autoComplete="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
+              disabled={isSubmitting}
               required
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="password" className="text-sm">Password</Label>
+            <Label htmlFor="password" className="text-sm">
+              Password
+            </Label>
             <Input
               id="password"
               type="password"
@@ -79,6 +89,7 @@ export function LoginForm() {
               autoComplete="current-password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
+              disabled={isSubmitting}
               required
             />
           </div>
@@ -89,8 +100,15 @@ export function LoginForm() {
             </p>
           ) : null}
 
-          <Button type="submit" size="sm" className="w-full" disabled={isSubmitting}>
-            {isSubmitting ? "Signing in..." : "Sign in"}
+          <Button
+            type="submit"
+            size="sm"
+            className="w-full"
+            disabled={isSubmitting}
+            aria-busy={isSubmitting || undefined}
+            aria-label={isSubmitting ? "Signing in" : "Sign in"}
+          >
+            {isSubmitting ? <Spinner className="size-4" /> : "Sign in"}
           </Button>
         </form>
       </CardContent>

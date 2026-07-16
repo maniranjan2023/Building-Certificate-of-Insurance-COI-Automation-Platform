@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, Workflow } from "lucide-react";
 import { AgentOutputDialog } from "@/components/coi/agent-output-dialog";
 import { buildPipelineTimelineItems } from "@/components/coi/pipeline-timeline-utils";
+import { pipelineStageIcon } from "@/components/coi/pipeline-stage-icons";
 import { AiResultsPanel } from "@/components/coi/ai-results-panel";
 import { Badge } from "@/components/ui/badge";
 import { Timeline } from "@/components/ui/timeline";
@@ -79,7 +80,10 @@ export function CoiPipelinePanel({
         stages: status.stages,
         steps: status.steps,
         onSelectStep: handleSelectStep,
-      }),
+      }).map((item) => ({
+        ...item,
+        icon: pipelineStageIcon(item.id),
+      })),
     [status.stages, status.steps, handleSelectStep]
   );
 
@@ -115,27 +119,28 @@ export function CoiPipelinePanel({
   return (
     <div className="min-w-0 space-y-4">
       <section className="relative min-w-0 overflow-hidden rounded-2xl border bg-card shadow-sm">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_100%_0%,oklch(0.62_0.19_255/0.08),transparent_60%)]"
-        />
         <div className="relative space-y-4 p-5 md:p-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="min-w-0">
-              <h2 className="text-lg font-semibold tracking-tight">
-                AI processing pipeline
-              </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Live worker and agent steps. Click a completed step to inspect
-                input and JSON output.
-              </p>
+            <div className="flex min-w-0 items-start gap-3">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm">
+                <Workflow className="size-5" aria-hidden />
+              </div>
+              <div className="min-w-0">
+                <h2 className="text-lg font-semibold tracking-tight">
+                  Processing pipeline
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Scroll left to right through stages. Click a finished step to
+                  inspect input and output.
+                </p>
+              </div>
             </div>
             {status.isActive ? (
-              <div className="flex shrink-0 items-center gap-2 rounded-full border bg-background/80 px-3 py-1.5 text-xs text-muted-foreground">
+              <div className="flex shrink-0 items-center gap-2 rounded-full border border-sky-500/30 bg-sky-500/10 px-3 py-1.5 text-xs text-sky-700 dark:text-sky-300">
                 {isRefreshing ? (
                   <Loader2 className="size-3.5 animate-spin" />
                 ) : null}
-                Live · updates every 2s
+                Live · every 2s
               </div>
             ) : null}
           </div>
@@ -165,7 +170,7 @@ export function CoiPipelinePanel({
             </p>
           ) : null}
 
-          <div className="min-w-0 overflow-x-hidden rounded-xl border bg-muted/20 p-4 md:p-5">
+          <div className="min-w-0 rounded-xl border bg-muted/20 p-4 md:p-5">
             {status.isActive && status.steps.length === 0 ? (
               <p className="mb-3 text-sm text-muted-foreground">
                 Waiting for worker to start… current stage:{" "}
@@ -181,7 +186,7 @@ export function CoiPipelinePanel({
 
             <Timeline
               items={timelineItems}
-              orientation="vertical"
+              orientation="horizontal"
               variant="compact"
             />
 

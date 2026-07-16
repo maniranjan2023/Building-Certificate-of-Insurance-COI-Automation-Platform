@@ -1,4 +1,8 @@
+"use client";
+
+import { ClipboardList } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { ExpandableText } from "@/components/ui/expandable-text";
 import type { ChecklistAgentOutput } from "@/lib/ai/schemas";
 import { cn } from "@/lib/utils";
 
@@ -36,13 +40,18 @@ export function ChecklistResultsTable({
       )}
     >
       <div className="flex flex-wrap items-start justify-between gap-3 border-b px-4 py-3 md:px-5">
-        <div className="min-w-0">
-          <h2 className="font-semibold tracking-tight">Checklist results</h2>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            {checklist.allPassed
-              ? "All checklist items passed"
-              : `${checklist.mandatoryFailures.length} mandatory issue(s)`}
-          </p>
+        <div className="flex min-w-0 items-start gap-3">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-blue-600/10 text-blue-600">
+            <ClipboardList className="size-4" aria-hidden />
+          </div>
+          <div className="min-w-0">
+            <h2 className="font-semibold tracking-tight">Checklist results</h2>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              {checklist.allPassed
+                ? "All checklist items passed"
+                : `${checklist.mandatoryFailures.length} mandatory issue(s)`}
+            </p>
+          </div>
         </div>
         <div className="flex flex-wrap gap-1.5 text-xs">
           <span className="rounded-md border bg-muted/40 px-2 py-1 tabular-nums">
@@ -82,10 +91,12 @@ export function ChecklistResultsTable({
                 <td className="px-4 py-2.5 tabular-nums text-muted-foreground">
                   {index + 1}
                 </td>
-                <td className="max-w-[220px] px-4 py-2.5 font-medium">
-                  <span className="line-clamp-2" title={item.label}>
-                    {item.label}
-                  </span>
+                <td className="max-w-[280px] px-4 py-2.5 font-medium">
+                  <ExpandableText
+                    text={item.label}
+                    title="Requirement"
+                    clampClassName="line-clamp-2"
+                  />
                 </td>
                 <td className="px-4 py-2.5">
                   <span className="rounded-md border bg-muted/30 px-2 py-0.5 text-xs">
@@ -97,11 +108,13 @@ export function ChecklistResultsTable({
                     {item.status}
                   </Badge>
                 </td>
-                <td className="max-w-[280px] px-4 py-2.5 text-muted-foreground">
+                <td className="max-w-[360px] px-4 py-2.5 text-muted-foreground">
                   {item.evidence ? (
-                    <span className="line-clamp-2" title={item.evidence}>
-                      {item.evidence}
-                    </span>
+                    <ExpandableText
+                      text={item.evidence}
+                      title="Evidence"
+                      clampClassName="line-clamp-2"
+                    />
                   ) : (
                     "—"
                   )}

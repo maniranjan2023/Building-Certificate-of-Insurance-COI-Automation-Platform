@@ -6,6 +6,7 @@ import { useState } from "react";
 import { motion, type Transition } from "framer-motion";
 import {
   ChevronsUpDown,
+  ExternalLink,
   LogOut,
   ShieldCheck,
 } from "lucide-react";
@@ -101,11 +102,14 @@ function NavLink({
   const content = (
     <>
       <Icon className="h-4 w-4 shrink-0" />
-      <motion.span variants={labelVariants} className="flex min-w-0 items-center">
+      <motion.span variants={labelVariants} className="flex min-w-0 flex-1 items-center">
         {!isCollapsed ? (
-          <span className="ml-2 flex min-w-0 items-center gap-2">
+          <span className="ml-2 flex min-w-0 flex-1 items-center gap-2">
             <span className="truncate text-sm font-medium">{item.label}</span>
-            {item.badge ? (
+            {item.openInNewTab ? (
+              <ExternalLink className="size-3 shrink-0 text-muted-foreground" aria-hidden />
+            ) : null}
+            {item.badge && !item.openInNewTab ? (
               <Badge
                 className="h-fit w-fit rounded border-none bg-primary/10 px-1.5 text-[10px] text-primary"
                 variant="outline"
@@ -124,6 +128,20 @@ function NavLink({
       <div className={className} aria-disabled title={item.description}>
         {content}
       </div>
+    );
+  }
+
+  if (item.openInNewTab) {
+    return (
+      <a
+        href={item.href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={className}
+        title={`${item.label} (opens in a new tab)`}
+      >
+        {content}
+      </a>
     );
   }
 

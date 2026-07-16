@@ -3,7 +3,7 @@ import {
   ArrowLeft,
   ExternalLink,
   History,
-  Sparkles,
+  ShieldCheck,
 } from "lucide-react";
 import type { CoiStatus, IntakeSource, JobStatus } from "@prisma/client";
 import { JOB_STATUS_LABELS } from "@/lib/constants/job-status";
@@ -17,6 +17,7 @@ import { VersionBadge } from "@/components/ui/version-badge";
 import { Button } from "@/components/ui/button";
 import { CoiDeleteButton } from "@/components/coi/coi-delete-button";
 import { AuditExportButton } from "@/components/coi/audit-export-button";
+import { ExpandableText } from "@/components/ui/expandable-text";
 import { coiAssetApiPath } from "@/lib/coi-asset-path";
 
 interface CoiDetailHeaderProps {
@@ -49,18 +50,9 @@ export function CoiDetailHeader({
   rejectionReason,
 }: CoiDetailHeaderProps) {
   return (
-    <section className="relative min-w-0 overflow-hidden rounded-2xl border bg-card shadow-sm">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_75%_55%_at_0%_0%,oklch(0.62_0.19_255/0.14),transparent_55%),radial-gradient(ellipse_50%_40%_at_100%_100%,oklch(0.72_0.14_280/0.1),transparent_50%)]"
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -right-12 -top-12 size-40 rounded-full bg-primary/10 blur-3xl"
-      />
-
-      <div className="relative p-5 md:p-6">
-        <Button asChild variant="ghost" size="sm" className="mb-3 h-8 px-0 text-sm">
+    <section className="min-w-0 overflow-hidden rounded-2xl border bg-card shadow-sm">
+      <div className="p-5 md:p-6">
+        <Button asChild variant="ghost" size="sm" className="mb-4 h-8 px-0 text-sm">
           <Link href="/dashboard">
             <ArrowLeft className="size-3.5" />
             Back to portfolio
@@ -68,58 +60,77 @@ export function CoiDetailHeader({
         </Button>
 
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0 flex-1 space-y-3">
-            <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
-              <Sparkles className="size-3.5" />
-              COI review workspace
+          <div className="flex min-w-0 flex-1 gap-4">
+            <div
+              className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm md:size-14"
+              aria-hidden
+            >
+              <ShieldCheck className="size-7 md:size-8" strokeWidth={2} />
             </div>
 
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <h1 className="min-w-0 truncate text-2xl font-semibold tracking-tight md:text-3xl">
-                {fileName}
-              </h1>
-              {versionNumber != null ? (
-                <VersionBadge versionNumber={versionNumber} />
-              ) : null}
-            </div>
+            <div className="min-w-0 flex-1 space-y-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-blue-600 dark:text-blue-400">
+                Certificate of Insurance
+              </p>
 
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted-foreground">
-              <span>Uploaded {formatDate(createdAt)}</span>
-              <span>{formatBytes(fileSizeBytes)}</span>
-              <span className="truncate">{mimeType}</span>
-            </div>
-
-            {senderEmail ? (
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="flex size-8 items-center justify-center rounded-lg border bg-muted/50 text-[10px] font-semibold uppercase">
-                  {getInitials(senderEmail)}
-                </div>
-                {senderId ? (
-                  <Link
-                    href={`/tenants/${senderId}`}
-                    className="text-sm font-medium hover:text-primary hover:underline"
-                  >
-                    {senderEmail}
-                  </Link>
-                ) : (
-                  <span className="text-sm font-medium">{senderEmail}</span>
-                )}
-                {senderId ? (
-                  <Button asChild variant="outline" size="sm" className="h-7 text-xs">
-                    <Link href={`/tenants/${senderId}`}>
-                      <History className="size-3" />
-                      Tenant history
-                    </Link>
-                  </Button>
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <h1 className="min-w-0 text-2xl font-semibold tracking-tight md:text-3xl">
+                  <ExpandableText
+                    text={fileName}
+                    title="File name"
+                    clampClassName="line-clamp-1"
+                    className="font-semibold"
+                  />
+                </h1>
+                {versionNumber != null ? (
+                  <VersionBadge versionNumber={versionNumber} />
                 ) : null}
               </div>
-            ) : null}
 
-            {rejectionReason ? (
-              <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400">
-                Rejection reason: {rejectionReason}
-              </p>
-            ) : null}
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted-foreground">
+                <span>Uploaded {formatDate(createdAt)}</span>
+                <span>{formatBytes(fileSizeBytes)}</span>
+                <span className="break-all">{mimeType}</span>
+              </div>
+
+              {senderEmail ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex size-8 items-center justify-center rounded-lg border border-blue-600/20 bg-blue-600/10 text-[10px] font-semibold uppercase text-blue-700 dark:text-blue-300">
+                    {getInitials(senderEmail)}
+                  </div>
+                  {senderId ? (
+                    <Link
+                      href={`/tenants/${senderId}`}
+                      className="text-sm font-medium hover:text-blue-600 hover:underline"
+                    >
+                      {senderEmail}
+                    </Link>
+                  ) : (
+                    <span className="text-sm font-medium">{senderEmail}</span>
+                  )}
+                  {senderId ? (
+                    <Button asChild variant="outline" size="sm" className="h-7 text-xs">
+                      <Link href={`/tenants/${senderId}`}>
+                        <History className="size-3" />
+                        Tenant history
+                      </Link>
+                    </Button>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {rejectionReason ? (
+                <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400">
+                  <p className="font-medium">Rejection reason</p>
+                  <ExpandableText
+                    text={rejectionReason}
+                    title="Rejection reason"
+                    clampClassName="line-clamp-2"
+                    className="mt-1 text-red-600 dark:text-red-400"
+                  />
+                </div>
+              ) : null}
+            </div>
           </div>
 
           <div className="flex shrink-0 flex-col items-start gap-2 lg:items-end">

@@ -13,7 +13,7 @@ import { ReviewActionsPanel } from "@/components/coi/review-actions-panel";
 import { ResubmitForm } from "@/components/coi/resubmit-form";
 import { DocumentActivityPanel } from "@/components/tenants/document-activity-panel";
 import { resolveSenderIdForDocument } from "@/lib/services/tenant-activity";
-import { FileImage, UploadCloud } from "lucide-react";
+import { FileImage, Upload } from "lucide-react";
 import type { ReportAgentOutput } from "@/lib/ai/schemas";
 import { JobStatus } from "@prisma/client";
 import { coiAssetApiPath } from "@/lib/coi-asset-path";
@@ -47,7 +47,7 @@ export default async function CoiDetailPage({ params }: CoiDetailPageProps) {
     document.senderEmail ?? document.sender?.email ?? null;
 
   return (
-    <div className="mx-auto min-w-0 max-w-6xl space-y-6 overflow-x-hidden">
+    <div className="min-w-0 w-full space-y-5">
       <CoiDetailHeader
         documentId={id}
         fileName={document.fileName}
@@ -68,13 +68,18 @@ export default async function CoiDetailPage({ params }: CoiDetailPageProps) {
       ) : null}
 
       {/* Top row: upload (left) + PDF preview (right) */}
-      <div className="grid min-w-0 gap-4 lg:grid-cols-2">
+      <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)]">
         <section className="min-w-0 overflow-hidden rounded-2xl border bg-card shadow-sm">
-          <div className="border-b px-4 py-3 md:px-5">
-            <h2 className="font-semibold tracking-tight">Upload / resubmit</h2>
-            <p className="text-xs text-muted-foreground">
-              Replace this COI with a corrected version for the same tenant
-            </p>
+          <div className="flex items-start gap-3 border-b px-4 py-3 md:px-5">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-blue-600/10 text-blue-600">
+              <Upload className="size-4" aria-hidden />
+            </div>
+            <div className="min-w-0">
+              <h2 className="font-semibold tracking-tight">Upload / resubmit</h2>
+              <p className="text-xs text-muted-foreground">
+                Replace this COI with a corrected version for the same tenant
+              </p>
+            </div>
           </div>
           <div className="p-4 md:p-5">
             {document.senderEmail ? (
@@ -85,7 +90,7 @@ export default async function CoiDetailPage({ params }: CoiDetailPageProps) {
               />
             ) : (
               <div className="rounded-xl border border-dashed px-4 py-10 text-center">
-                <UploadCloud className="mx-auto size-8 text-muted-foreground" />
+                <Upload className="mx-auto size-8 text-blue-600/70" />
                 <p className="mt-3 text-sm font-medium">No tenant email on file</p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   Resubmit is available once a sender email is linked to this
@@ -97,11 +102,16 @@ export default async function CoiDetailPage({ params }: CoiDetailPageProps) {
         </section>
 
         <section className="min-w-0 overflow-hidden rounded-2xl border bg-card shadow-sm">
-          <div className="border-b px-4 py-3 md:px-5">
-            <h2 className="font-semibold tracking-tight">Document preview</h2>
-            <p className="text-xs text-muted-foreground">
-              Scroll inside the viewer — page layout stays fixed
-            </p>
+          <div className="flex items-start gap-3 border-b px-4 py-3 md:px-5">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-blue-600/10 text-blue-600">
+              <FileImage className="size-4" aria-hidden />
+            </div>
+            <div className="min-w-0">
+              <h2 className="font-semibold tracking-tight">Document preview</h2>
+              <p className="text-xs text-muted-foreground">
+                Scroll inside the viewer — page layout stays fixed
+              </p>
+            </div>
           </div>
           <div className="min-w-0 overflow-x-hidden p-4 md:p-5">
             {isPdf ? (
@@ -124,7 +134,7 @@ export default async function CoiDetailPage({ params }: CoiDetailPageProps) {
       </div>
 
       {/* Full-width stacked analysis sections */}
-      <div className="flex min-w-0 flex-col gap-4 overflow-x-hidden">
+      <div className="flex min-w-0 flex-col gap-4">
         {document.version && pipelineStatus ? (
           <CoiPipelinePanel
             documentId={id}

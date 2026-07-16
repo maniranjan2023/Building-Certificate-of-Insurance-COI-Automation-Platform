@@ -15,6 +15,7 @@ import {
   Minus,
   X,
 } from "lucide-react";
+import { ExpandableText } from "@/components/ui/expandable-text";
 import { cn } from "@/lib/utils";
 
 const timelineVariants = cva("relative flex", {
@@ -39,7 +40,7 @@ const timelineItemVariants = cva("relative flex pb-2", {
   variants: {
     orientation: {
       vertical: "flex-row gap-3",
-      horizontal: "min-w-[9.5rem] max-w-[11rem] shrink-0 flex-col items-center gap-2 px-1",
+      horizontal: "min-w-[10.5rem] max-w-[13rem] shrink-0 flex-col items-center gap-2 px-1",
     },
   },
   defaultVariants: {
@@ -234,9 +235,12 @@ export function Timeline({
                 {item.title}
               </button>
               {item.description ? (
-                <p className="text-[10px] leading-snug text-muted-foreground line-clamp-2">
-                  {item.description}
-                </p>
+                <ExpandableText
+                  text={item.description}
+                  title={item.title}
+                  clampClassName="line-clamp-2"
+                  className="text-[10px] leading-snug text-muted-foreground"
+                />
               ) : null}
               <span
                 className={cn(
