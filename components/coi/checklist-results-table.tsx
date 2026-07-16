@@ -1,5 +1,3 @@
-"use client";
-
 import { ClipboardList } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ExpandableText } from "@/components/ui/expandable-text";

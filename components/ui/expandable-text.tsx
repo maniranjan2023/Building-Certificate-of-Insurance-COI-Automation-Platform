@@ -77,7 +77,7 @@ export function ExpandableText({
         ) : null}
       </button>
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={setOpen} modal={false}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
