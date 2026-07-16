@@ -2,6 +2,12 @@
 
 > Every rental property needs proof of insurance. This platform replaces manual PDF review with automated intake, AI validation, and tenant communication — so landlords stay compliant without drowning in paperwork.
 
+
+
+## COI Compliance Automation Platform User Guide:
+
+https://app.trupeer.ai/view/omcZ7gVJN/coi-compliance-automation-platform-user-guide
+
 ---
 
 ## Table of Contents
